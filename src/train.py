@@ -51,11 +51,40 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 # HELPER: BUAT DATASET TENSORFLOW
 # ─────────────────────────────────────────────
 
+def align_symptom_data(X_sym, target_size):
+    """
+    Sejajarkan jumlah sampel gejala dengan jumlah sampel citra.
+    Jika X_sym lebih kecil, ulangi/tile data dengan seed tetap.
+    
+    Parameter:
+        X_sym       : array gejala (N_sym, features)
+        target_size : jumlah sampel target (N_img)
+    
+    Return:
+        X_sym_aligned : array gejala yang sudah disejajarkan (target_size, features)
+    """
+    if len(X_sym) == target_size:
+        return X_sym
+    elif len(X_sym) < target_size:
+        # Ulangi gejala sampai mencapai ukuran target
+        n_repeats = target_size // len(X_sym) + 1
+        X_sym_repeated = np.tile(X_sym, (n_repeats, 1))
+        X_sym_aligned = X_sym_repeated[:target_size]
+        print(f"  ⚠️  Gejala diulang: {len(X_sym)} → {target_size} sampel")
+        return X_sym_aligned
+    else:
+        # Sampel gejala lebih banyak (jarang terjadi)
+        return X_sym[:target_size]
+
+
 def make_dataset(X_img, X_sym, y, batch_size, shuffle=True):
     """
     Buat tf.data.Dataset dari array numpy.
     Lebih efisien dari fit() langsung dengan numpy array besar.
     """
+    # Sejajarkan gejala dengan citra
+    X_sym = align_symptom_data(X_sym, len(X_img))
+    
     ds = tf.data.Dataset.from_tensor_slices(
         ({'input_citra': X_img, 'input_gejala': X_sym}, y)
     )
@@ -109,6 +138,9 @@ def evaluate_model(model, ds_test, X_img_test, X_sym_test, y_test):
     """
     print("\n=== EVALUASI MODEL ===")
 
+    # Sejajarkan gejala dengan citra sebelum prediksi
+    X_sym_test = align_symptom_data(X_sym_test, len(X_img_test))
+    
     # Prediksi
     y_pred_prob = model.predict(
         {'input_citra': X_img_test, 'input_gejala': X_sym_test},

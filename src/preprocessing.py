@@ -31,14 +31,22 @@ from sklearn.model_selection import train_test_split
 
 
 # ─────────────────────────────────────────────
-# KONFIGURASI
+# KONFIGURASI - PATH OTOMATIS
 # ─────────────────────────────────────────────
-IMG_SIZE    = (224, 224)      # ukuran input CNN (tinggi x lebar)
-DATA_PATH   = 'data/'         # root folder data
+IMG_SIZE    = (224, 224)
+
+# Path dihitung dari lokasi file ini (src/) naik ke root folder
+_SRC_DIR    = os.path.dirname(os.path.abspath(__file__))
+_ROOT_DIR   = os.path.dirname(_SRC_DIR)
+
+DATA_PATH   = os.path.join(_ROOT_DIR, 'data')
 IMAGE_PATH  = os.path.join(DATA_PATH, 'images')
 SYMPTOM_CSV = os.path.join(DATA_PATH, 'symptoms.csv')
 
-CLASSES = ['campak', 'rubella', 'cacar']   # nama folder = nama kelas
+# URUTAN INI MENENTUKAN LABEL INTEGER:
+# campak=0, rubella=1, cacar=2
+# JANGAN diubah urutannya setelah training!
+CLASSES = ['campak', 'rubella', 'cacar']
 SPLITS  = ['training', 'validasi', 'test'] # nama subfolder
 
 
@@ -76,8 +84,10 @@ def load_images_from_split(split: str) -> tuple:
         y : np.ndarray shape (N,) berisi label integer
     """
     X, y = [], []
-    label_encoder = LabelEncoder()
-    label_encoder.fit(CLASSES)
+
+    # Gunakan mapping manual agar urutan label PASTI sesuai CLASSES
+    # campak=0, rubella=1, cacar=2 (bukan alfabetis!)
+    class_to_idx = {cls: idx for idx, cls in enumerate(CLASSES)}
 
     valid_ext = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
 
@@ -98,12 +108,12 @@ def load_images_from_split(split: str) -> tuple:
             try:
                 img = load_image(fpath)
                 X.append(img)
-                y.append(cls)
+                y.append(class_to_idx[cls])   # integer langsung, bukan string
             except Exception as e:
                 print(f"  [ERROR] Gagal membaca {fpath}: {e}")
 
     X = np.array(X, dtype=np.float32)
-    y = label_encoder.transform(y)
+    y = np.array(y, dtype=np.int64)
     return X, y
 
 
@@ -186,10 +196,12 @@ def load_symptoms(csv_path: str = SYMPTOM_CSV) -> tuple:
     scaler = StandardScaler()
     X_sym[:, 0] = scaler.fit_transform(X_sym[:, 0].reshape(-1, 1)).ravel()
 
-    # Encode label
+    # Encode label — mapping manual agar konsisten dengan citra
+    # campak=0, rubella=1, cacar=2
+    class_to_idx = {cls: idx for idx, cls in enumerate(CLASSES)}
     le = LabelEncoder()
     le.fit(CLASSES)
-    y = le.transform(y_raw)
+    y = np.array([class_to_idx[label] for label in y_raw], dtype=np.int64)
 
     print(f"  Distribusi kelas: {dict(zip(*np.unique(y_raw, return_counts=True)))}")
     return X_sym, y, scaler, le

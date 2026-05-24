@@ -1,0 +1,32 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+flask-backend/.env
+
+# Uploads
+flask-backend/uploads/*
+!flask-backend/uploads/.gitkeep
+
+# Model files (too large for git)
+model/*.keras
+model/*.h5
+model/*.pkl
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Notebooks checkpoints
+notebooks/.ipynb_checkpoints/
