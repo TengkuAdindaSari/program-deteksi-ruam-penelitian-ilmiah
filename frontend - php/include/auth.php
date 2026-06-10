@@ -4,6 +4,12 @@
  * Manajemen session dan autentikasi
  */
 
+// Fix session persistence untuk PHP built-in server
+$sessionPath = sys_get_temp_dir() . '/dermdetect_sessions';
+if (!is_dir($sessionPath)) { mkdir($sessionPath, 0777, true); }
+session_save_path($sessionPath);
+ini_set('session.gc_maxlifetime', 86400);
+ini_set('session.cookie_lifetime', 86400);
 session_start();
 
 function isLoggedIn() {

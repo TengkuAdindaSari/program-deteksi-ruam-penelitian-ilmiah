@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS diagnoses (
     prob_rubella     FLOAT        DEFAULT NULL,
     prob_cacar       FLOAT        DEFAULT NULL,
     status           ENUM('selesai','review','dihapus') DEFAULT 'selesai',
+    triple_data      TEXT         DEFAULT NULL,
     created_at       DATETIME     DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id)  REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (model_id) REFERENCES model_versions(id) ON DELETE SET NULL

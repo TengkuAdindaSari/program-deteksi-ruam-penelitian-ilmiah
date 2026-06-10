@@ -88,12 +88,20 @@ class Diagnosis(db.Model):  # type: ignore[name-defined]
     prob_rubella     = db.Column(db.Float, nullable=True)
     prob_cacar       = db.Column(db.Float, nullable=True)
     status           = db.Column(db.Enum('selesai', 'review', 'dihapus'), default='selesai')
+    triple_data      = db.Column(db.Text, nullable=True)
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
     def to_dict(self):
+        import json
+        triple = None
+        if self.triple_data:
+            try:
+                triple = json.loads(self.triple_data)
+            except Exception:
+                pass
         return {
             'id'              : self.id,
             'user_id'         : self.user_id,
@@ -116,5 +124,6 @@ class Diagnosis(db.Model):  # type: ignore[name-defined]
                 'cacar'  : round((self.prob_cacar   or 0) * 100, 2),
             },
             'status'          : self.status,
+            'triple'          : triple,
             'created_at'      : self.created_at.isoformat() if self.created_at else None,
         }

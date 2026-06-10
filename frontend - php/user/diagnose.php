@@ -25,10 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($res['success'] ?? false) {
             $id = $res['data']['id'];
+            // Simpan triple result ke session untuk ditampilkan di halaman result
+            $_SESSION['triple_result_' . $id] = $res['data']['triple'] ?? null;
             header("Location: /user/result.php?id=$id");
             exit;
         } else {
-            $error = 'Response API: ' . var_export($res, true);
+            $error = $res['message'] ?? 'Prediksi gagal, coba lagi';
         }
     }
 }
@@ -89,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="card-body">
                         <div class="upload-box" onclick="document.getElementById('fotoInput').click();">
                             <i class="ti ti-cloud-upload"></i>
-                            <p><strong>Klik untuk pilih foto</strong><br>atau drag & drop di sini</p>
+                            <p><strong>Klik untuk pilih foto</strong><br>atau drag &amp; drop di sini</p>
                             <p class="text-sm text-muted mt-1">JPG, PNG — maks. 5MB</p>
                         </div>
                         <input type="file" id="fotoInput" name="foto" accept="image/*"
