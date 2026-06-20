@@ -13,12 +13,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Foto wajib diupload';
     } else {
         $data = [
-            'durasi_demam'     => (int)($_POST['durasi_demam'] ?? 4),
-            'batuk'            => isset($_POST['batuk'])            ? 1 : 0,
-            'mata_merah'       => isset($_POST['mata_merah'])       ? 1 : 0,
-            'kelenjar_bengkak' => isset($_POST['kelenjar_bengkak']) ? 1 : 0,
-            'pola_ruam'        => isset($_POST['pola_ruam'])        ? 1 : 0,
-            'vesikel'          => isset($_POST['vesikel'])          ? 1 : 0,
+            'durasi_demam'       => (int)($_POST['durasi_demam'] ?? 4),
+            'demam_tinggi'       => isset($_POST['demam_tinggi'])       ? 1 : 0,
+            'batuk'              => isset($_POST['batuk'])              ? 1 : 0,
+            'pilek'              => isset($_POST['pilek'])              ? 1 : 0,
+            'sakit_tenggorokan'  => isset($_POST['sakit_tenggorokan'])  ? 1 : 0,
+            'mata_merah'         => isset($_POST['mata_merah'])         ? 1 : 0,
+            'koplik_spot'        => isset($_POST['koplik_spot'])        ? 1 : 0,
+            'kelenjar_bengkak'   => isset($_POST['kelenjar_bengkak'])   ? 1 : 0,
+            'pola_ruam'          => isset($_POST['pola_ruam'])          ? 1 : 0,
+            'nyeri_sendi'        => isset($_POST['nyeri_sendi'])        ? 1 : 0,
+            'vesikel'            => isset($_POST['vesikel'])            ? 1 : 0,
+            'hilang_nafsu_makan' => isset($_POST['hilang_nafsu_makan']) ? 1 : 0,
+            'lemas'              => isset($_POST['lemas'])              ? 1 : 0,
         ];
 
         $res = Api::post('/diagnose/predict', $data, $token, ['foto' => $_FILES['foto']]);
@@ -107,35 +114,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <h3>Gejala Klinis</h3>
                     </div>
                     <div class="card-body">
-                        <div class="form-group">
-                            <label class="form-label">
-                                Durasi demam: <strong id="durasiVal">4</strong> hari
+                        <!-- Durasi Slider -->
+                        <div class="form-group mb-4" style="background:#F9FAFB; padding:16px; border-radius:8px; border:1px solid #E5E7EB; margin-bottom: 20px;">
+                            <label class="form-label" style="font-weight:600; margin-bottom:8px; display:block;">
+                                <i class="ti ti-calendar-time" style="color:#2563EB; font-size:16px; margin-right:4px;"></i> Durasi Demam: <strong id="durasiVal" style="color:#2563EB; font-size:18px;">4</strong> hari
                             </label>
                             <input type="range" name="durasi_demam" min="0" max="14" value="4"
-                                   oninput="document.getElementById('durasiVal').textContent=this.value">
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" id="batuk" name="batuk">
-                            <label for="batuk">Batuk kering</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" id="mata_merah" name="mata_merah">
-                            <label for="mata_merah">Mata merah (konjungtivitis)</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" id="kelenjar_bengkak" name="kelenjar_bengkak">
-                            <label for="kelenjar_bengkak">Pembengkakan kelenjar getah bening</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" id="pola_ruam" name="pola_ruam">
-                            <label for="pola_ruam">Ruam menyebar dari wajah ke badan</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" id="vesikel" name="vesikel">
-                            <label for="vesikel">Ruam berupa gelembung berisi cairan</label>
+                                   oninput="document.getElementById('durasiVal').textContent=this.value"
+                                   style="width:100%; accent-color:#2563EB;">
+                            <div class="flex justify-between text-xs text-muted" style="margin-top:4px; display: flex; justify-content: space-between;">
+                                <span>0 Hari</span>
+                                <span>7 Hari</span>
+                                <span>14 Hari</span>
+                            </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary btn-block mt-4">
+                        <!-- Grid Kategori Gejala -->
+                        <div style="display:flex; flex-direction:column; gap:16px; margin-bottom:20px;">
+                            
+                            <!-- Kategori 1: Gejala Umum -->
+                            <div style="background:#FFFDF9; border:1px solid #FEF3C7; border-radius:8px; padding:14px;">
+                                <h4 style="margin:0 0 10px 0; font-size:13px; font-weight:700; color:#B45309; display:flex; align-items:center; gap:6px;">
+                                    <i class="ti ti-activity" style="font-size:15px;"></i> Gejala Umum / Sistemik
+                                </h4>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="demam_tinggi" name="demam_tinggi">
+                                        <label for="demam_tinggi" style="font-size:13px; font-weight:500; cursor:pointer;">Demam Tinggi (>38.5°C)</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="lemas" name="lemas">
+                                        <label for="lemas" style="font-size:13px; font-weight:500; cursor:pointer;">Badan Lemas & Cepat Lelah</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="hilang_nafsu_makan" name="hilang_nafsu_makan">
+                                        <label for="hilang_nafsu_makan" style="font-size:13px; font-weight:500; cursor:pointer;">Hilang Nafsu Makan</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kategori 2: Gejala Pernafasan & Kepala -->
+                            <div style="background:#F0FDF4; border:1px solid #DCFCE7; border-radius:8px; padding:14px;">
+                                <h4 style="margin:0 0 10px 0; font-size:13px; font-weight:700; color:#15803D; display:flex; align-items:center; gap:6px;">
+                                    <i class="ti ti-wind" style="font-size:15px;"></i> Pernafasan & Kepala
+                                </h4>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="batuk" name="batuk">
+                                        <label for="batuk" style="font-size:13px; font-weight:500; cursor:pointer;">Batuk Kering</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="pilek" name="pilek">
+                                        <label for="pilek" style="font-size:13px; font-weight:500; cursor:pointer;">Pilek / Hidung Tersumbat</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="sakit_tenggorokan" name="sakit_tenggorokan">
+                                        <label for="sakit_tenggorokan" style="font-size:13px; font-weight:500; cursor:pointer;">Sakit Tenggorokan</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="mata_merah" name="mata_merah">
+                                        <label for="mata_merah" style="font-size:13px; font-weight:500; cursor:pointer;">Mata Merah (Konjungtivitis)</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kategori 3: Ruam & Gejala Khas -->
+                            <div style="background:#EFF6FF; border:1px solid #DBEAFE; border-radius:8px; padding:14px;">
+                                <h4 style="margin:0 0 10px 0; font-size:13px; font-weight:700; color:#1D4ED8; display:flex; align-items:center; gap:6px;">
+                                    <i class="ti ti-virus" style="font-size:15px;"></i> Ruam & Gejala Khas
+                                </h4>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="pola_ruam" name="pola_ruam">
+                                        <label for="pola_ruam" style="font-size:13px; font-weight:500; cursor:pointer;">Ruam Menyebar dari Wajah ke Badan</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="vesikel" name="vesikel">
+                                        <label for="vesikel" style="font-size:13px; font-weight:500; cursor:pointer;">Lenting Berisi Cairan (Vesikel)</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="koplik_spot" name="koplik_spot">
+                                        <label for="koplik_spot" style="font-size:13px; font-weight:500; cursor:pointer;">Bercak Koplik (Bintik Putih di Mulut)</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="kelenjar_bengkak" name="kelenjar_bengkak">
+                                        <label for="kelenjar_bengkak" style="font-size:13px; font-weight:500; cursor:pointer;">Pembengkakan Kelenjar (Leher/Telinga)</label>
+                                    </div>
+                                    <div class="form-check" style="display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="nyeri_sendi" name="nyeri_sendi">
+                                        <label for="nyeri_sendi" style="font-size:13px; font-weight:500; cursor:pointer;">Nyeri / Pegal Sendi</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">
                             <i class="ti ti-brain"></i> Analisis Sekarang
                         </button>
                     </div>

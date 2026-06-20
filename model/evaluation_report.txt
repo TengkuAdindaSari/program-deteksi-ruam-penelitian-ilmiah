@@ -1,13 +1,13 @@
-Test Loss    : 0.1695
-Test Accuracy: 0.9317 (93.17%)
+Test Loss    : 0.0983
+Test Accuracy: 0.9744 (97.44%)
 
 Classification Report:
               precision    recall  f1-score   support
 
-      campak       0.94      0.89      0.91        83
-     rubella       0.50      0.56      0.53         9
-       cacar       0.97      0.99      0.98       113
+      campak       0.93      1.00      0.96        13
+     rubella       1.00      1.00      1.00        13
+       cacar       1.00      0.92      0.96        13
 
-    accuracy                           0.93       205
-   macro avg       0.80      0.81      0.81       205
-weighted avg       0.93      0.93      0.93       205
+    accuracy                           0.97        39
+   macro avg       0.98      0.97      0.97        39
+weighted avg       0.98      0.97      0.97        39

@@ -7,3 +7,4 @@ seaborn
 pillow
 opencv-python
 jupyter
+streamlit

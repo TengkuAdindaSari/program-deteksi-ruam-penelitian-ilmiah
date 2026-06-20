@@ -1,23 +1,22 @@
 """
 preprocessing.py
 ================
-Memuat dan mempersiapkan data citra serta gejala klinis
-untuk klasifikasi penyakit ruam kulit (Campak, Rubella, Cacar Air).
+Preprocessing data citra (CNN) DAN gejala klinis (MLP) untuk
+klasifikasi penyakit ruam kulit: campak, rubella, cacar.
+Skema split: 80% train, 20% test (validasi diambil otomatis
+dari 10% bagian train saat training).
 
 Struktur folder yang diharapkan:
     data/
     ├── images/
     │   ├── campak/
-    │   │   ├── training/
-    │   │   ├── validasi/
-    │   │   └── test/
+    │   │   ├── train/   (80%, termasuk hasil augmentasi)
+    │   │   └── test/    (20%, gambar asli saja)
     │   ├── rubella/
-    │   │   ├── training/
-    │   │   ├── validasi/
+    │   │   ├── train/
     │   │   └── test/
     │   └── cacar/
-    │       ├── training/
-    │       ├── validasi/
+    │       ├── train/
     │       └── test/
     └── symptoms.csv
 """
@@ -26,28 +25,35 @@ import os
 import numpy as np
 import pandas as pd
 from PIL import Image
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 
 # ─────────────────────────────────────────────
-# KONFIGURASI - PATH OTOMATIS
+# KONFIGURASI — PATH OTOMATIS
 # ─────────────────────────────────────────────
-IMG_SIZE    = (224, 224)
+IMG_SIZE = (224, 224)
 
-# Path dihitung dari lokasi file ini (src/) naik ke root folder
-_SRC_DIR    = os.path.dirname(os.path.abspath(__file__))
-_ROOT_DIR   = os.path.dirname(_SRC_DIR)
+_SRC_DIR  = os.path.dirname(os.path.abspath(__file__))
+_ROOT_DIR = os.path.dirname(_SRC_DIR)
 
 DATA_PATH   = os.path.join(_ROOT_DIR, 'data')
 IMAGE_PATH  = os.path.join(DATA_PATH, 'images')
 SYMPTOM_CSV = os.path.join(DATA_PATH, 'symptoms.csv')
 
-# URUTAN INI MENENTUKAN LABEL INTEGER:
-# campak=0, rubella=1, cacar=2
+# Urutan ini MENENTUKAN label integer: campak=0, rubella=1, cacar=2
 # JANGAN diubah urutannya setelah training!
 CLASSES = ['campak', 'rubella', 'cacar']
-SPLITS  = ['training', 'validasi', 'test'] # nama subfolder
+SPLITS  = ['train', 'test']
+
+VALID_EXT = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
+
+# Kolom fitur gejala klinis (13 fitur, sesuai symptoms.csv)
+SYMPTOM_FEATURES = [
+    'durasi_demam', 'demam_tinggi', 'batuk', 'pilek', 'sakit_tenggorokan',
+    'konjungtivitis', 'koplik_spot', 'kelenjar_bengkak', 'ruam_wajah_ke_leher',
+    'nyeri_sendi', 'vesikel', 'hilang_nafsu_makan', 'lemas'
+]
 
 
 # ─────────────────────────────────────────────
@@ -55,60 +61,38 @@ SPLITS  = ['training', 'validasi', 'test'] # nama subfolder
 # ─────────────────────────────────────────────
 
 def load_image(filepath: str, img_size: tuple = IMG_SIZE) -> np.ndarray:
-    """
-    Membaca satu file gambar, resize, dan normalisasi piksel ke [0, 1].
-
-    Parameter:
-        filepath  : path ke file gambar (.jpg / .png)
-        img_size  : tuple (lebar, tinggi), default (224, 224)
-
-    Return:
-        np.ndarray shape (H, W, 3), dtype float32
-    """
-    img = Image.open(filepath).convert('RGB')   # pastikan 3 channel
-    img = img.resize(img_size)
-    img_array = np.array(img, dtype=np.float32) / 255.0
-    return img_array
+    """Baca 1 gambar, resize, normalisasi piksel ke [0, 1]."""
+    img = Image.open(filepath).convert('RGB').resize(img_size)
+    return np.array(img, dtype=np.float32) / 255.0
 
 
 def load_images_from_split(split: str) -> tuple:
     """
-    Memuat semua citra dari satu split (training / validasi / test)
-    untuk semua kelas.
-
-    Parameter:
-        split : 'training', 'validasi', atau 'test'
+    Memuat semua citra dari satu split (train/test) untuk semua kelas.
 
     Return:
         X : np.ndarray shape (N, 224, 224, 3)
-        y : np.ndarray shape (N,) berisi label integer
+        y : np.ndarray shape (N,) label integer
+        filenames : list nama file (untuk pencocokan urutan, opsional)
     """
     X, y = [], []
-
-    # Gunakan mapping manual agar urutan label PASTI sesuai CLASSES
-    # campak=0, rubella=1, cacar=2 (bukan alfabetis!)
     class_to_idx = {cls: idx for idx, cls in enumerate(CLASSES)}
-
-    valid_ext = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
 
     for cls in CLASSES:
         folder = os.path.join(IMAGE_PATH, cls, split)
-
         if not os.path.exists(folder):
             print(f"[WARNING] Folder tidak ditemukan: {folder}")
             continue
 
         files = [f for f in os.listdir(folder)
-                 if os.path.splitext(f)[1].lower() in valid_ext]
-
+                 if os.path.splitext(f)[1].lower() in VALID_EXT]
         print(f"  [{split}] {cls}: {len(files)} gambar ditemukan")
 
         for fname in files:
             fpath = os.path.join(folder, fname)
             try:
-                img = load_image(fpath)
-                X.append(img)
-                y.append(class_to_idx[cls])   # integer langsung, bukan string
+                X.append(load_image(fpath))
+                y.append(class_to_idx[cls])
             except Exception as e:
                 print(f"  [ERROR] Gagal membaca {fpath}: {e}")
 
@@ -118,118 +102,75 @@ def load_images_from_split(split: str) -> tuple:
 
 
 def load_all_images() -> dict:
-    """
-    Memuat citra dari semua split sekaligus.
-
-    Return:
-        dict berisi:
-            'X_train', 'y_train'
-            'X_val',   'y_val'
-            'X_test',  'y_test'
-    """
-    print("=== Memuat data citra ===")
-    split_map = {
-        'training' : ('X_train', 'y_train'),
-        'validasi'  : ('X_val',   'y_val'),
-        'test'      : ('X_test',  'y_test'),
+    """Memuat citra dari train dan test (skema 80/20)."""
+    print("=== Memuat data citra (skema 80/20) ===")
+    X_train, y_train = load_images_from_split('train')
+    print(f"  -> X_train: {X_train.shape}, y_train: {y_train.shape}")
+    X_test, y_test = load_images_from_split('test')
+    print(f"  -> X_test : {X_test.shape}, y_test : {y_test.shape}")
+    return {
+        'X_train': X_train, 'y_train': y_train,
+        'X_test' : X_test,  'y_test' : y_test,
     }
-
-    result = {}
-    for split, (x_key, y_key) in split_map.items():
-        X, y = load_images_from_split(split)
-        result[x_key] = X
-        result[y_key] = y
-        print(f"  → {x_key}: {X.shape}, {y_key}: {y.shape}")
-
-    return result
 
 
 # ─────────────────────────────────────────────
 # 2. PREPROCESSING GEJALA KLINIS
 # ─────────────────────────────────────────────
 
-def load_symptoms(csv_path: str = SYMPTOM_CSV) -> tuple:
+def load_symptoms(csv_path: str = None) -> tuple:
     """
-    Membaca symptoms.csv, memisahkan fitur dan label,
-    lalu melakukan encoding label dan normalisasi fitur numerik.
+    Membaca symptoms.csv, memisahkan fitur & label, normalisasi durasi_demam.
 
-    Kolom yang diharapkan di CSV:
-        label           : nama penyakit (campak / rubella / cacar)
-        durasi_demam    : jumlah hari demam (numerik)
-        batuk           : 0 atau 1
-        mata_merah      : 0 atau 1
-        kelenjar_bengkak: 0 atau 1
-        pola_ruam       : 0 atau 1  (menyebar wajah→badan)
-        vesikel         : 0 atau 1  (ruam berisi cairan)
+    Kolom yang diharapkan di CSV (13 fitur):
+        label, durasi_demam, demam_tinggi, batuk, pilek, sakit_tenggorokan,
+        konjungtivitis, koplik_spot, kelenjar_bengkak, ruam_wajah_ke_leher,
+        nyeri_sendi, vesikel, hilang_nafsu_makan, lemas
 
     Return:
-        X_sym : np.ndarray shape (N, 6), fitur gejala
-        y     : np.ndarray shape (N,),   label integer
+        X_sym : np.ndarray shape (N, 13)
+        y     : np.ndarray shape (N,) label integer
         scaler: StandardScaler yang sudah di-fit (simpan untuk inferensi)
-        le    : LabelEncoder yang sudah di-fit
     """
+    csv_path = csv_path or SYMPTOM_CSV
     print("\n=== Memuat data gejala klinis ===")
 
     if not os.path.exists(csv_path):
         raise FileNotFoundError(
-            f"File tidak ditemukan: {csv_path}\n"
-            "Pastikan symptoms.csv ada di folder data/"
+            f"File tidak ditemukan: {csv_path}\nPastikan symptoms.csv ada di folder data/"
         )
 
     df = pd.read_csv(csv_path)
     print(f"  Total baris: {len(df)}")
     print(f"  Kolom      : {list(df.columns)}")
 
-    # Pisahkan fitur dan label
-    feature_cols = ['durasi_demam', 'batuk', 'mata_merah',
-                    'kelenjar_bengkak', 'pola_ruam', 'vesikel']
-
-    # Validasi kolom
-    missing = [c for c in feature_cols + ['label'] if c not in df.columns]
+    missing = [c for c in SYMPTOM_FEATURES + ['label'] if c not in df.columns]
     if missing:
         raise ValueError(f"Kolom berikut tidak ada di CSV: {missing}")
 
-    X_sym = df[feature_cols].values.astype(np.float32)
+    X_sym = df[SYMPTOM_FEATURES].values.astype(np.float32)
     y_raw = df['label'].values
 
-    # Normalisasi fitur numerik (durasi_demam)
+    # Normalisasi hanya kolom durasi_demam (kolom indeks 0), sisanya sudah biner 0/1
     scaler = StandardScaler()
     X_sym[:, 0] = scaler.fit_transform(X_sym[:, 0].reshape(-1, 1)).ravel()
 
-    # Encode label — mapping manual agar konsisten dengan citra
-    # campak=0, rubella=1, cacar=2
     class_to_idx = {cls: idx for idx, cls in enumerate(CLASSES)}
-    le = LabelEncoder()
-    le.fit(CLASSES)
     y = np.array([class_to_idx[label] for label in y_raw], dtype=np.int64)
 
     print(f"  Distribusi kelas: {dict(zip(*np.unique(y_raw, return_counts=True)))}")
-    return X_sym, y, scaler, le
+    return X_sym, y, scaler
 
 
 def split_symptoms(X_sym: np.ndarray, y: np.ndarray,
-                   test_size: float = 0.1,
-                   val_size: float  = 0.1,
-                   random_state: int = 42) -> dict:
-    """
-    Membagi data gejala menjadi train / validasi / test.
-
-    Return:
-        dict berisi X_train, X_val, X_test, y_train, y_val, y_test
-    """
-    X_temp, X_test, y_temp, y_test = train_test_split(
-        X_sym, y, test_size=test_size, stratify=y,
-        random_state=random_state
+                    test_size: float = 0.2, random_state: int = 42) -> dict:
+    """Membagi data gejala menjadi train (80%) / test (20%)."""
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_sym, y, test_size=test_size, stratify=y, random_state=random_state
     )
-    val_ratio = val_size / (1 - test_size)
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_temp, y_temp, test_size=val_ratio, stratify=y_temp,
-        random_state=random_state
-    )
-    print(f"\n  Split gejala → train:{len(X_train)} | val:{len(X_val)} | test:{len(X_test)}")
+    print(f"\n  Split gejala -> train:{len(X_train)} | test:{len(X_test)}")
     return {
         'X_train': X_train, 'y_train': y_train,
-        'X_val'  : X_val,   'y_val'  : y_val,
         'X_test' : X_test,  'y_test' : y_test,
     }
 
@@ -238,47 +179,83 @@ def split_symptoms(X_sym: np.ndarray, y: np.ndarray,
 # 3. FUNGSI UTAMA: LOAD SEMUA DATA
 # ─────────────────────────────────────────────
 
-def load_data(data_path: str = DATA_PATH) -> dict:
+def load_data(data_path: str = None) -> dict:
     """
-    Fungsi utama — memanggil semua preprocessing dan
-    mengembalikan satu dict berisi data siap pakai.
+    Fungsi utama — load citra & gejala, kembalikan dict siap pakai.
+
+    PENTING: Karena jumlah gambar dan jumlah baris gejala TIDAK SAMA
+    (gambar bisa ratusan setelah augmentasi, gejala hanya puluhan baris),
+    kedua modalitas di-split SECARA TERPISAH dengan proporsi 80/20 yang
+    konsisten, lalu dipasangkan secara acak (sampling with replacement)
+    saat training agar ukuran batch citra & gejala selalu cocok.
 
     Return:
         {
-          'images' : { X_train, y_train, X_val, y_val, X_test, y_test },
-          'symptoms': { X_train, y_train, X_val, y_val, X_test, y_test },
+          'images'  : { X_train, y_train, X_test, y_test },
+          'symptoms': { X_train, y_train, X_test, y_test },
           'scaler'  : StandardScaler (simpan untuk inferensi),
-          'encoder' : LabelEncoder  (simpan untuk inferensi),
           'classes' : ['campak', 'rubella', 'cacar']
         }
     """
     global DATA_PATH, IMAGE_PATH, SYMPTOM_CSV
-    DATA_PATH   = data_path
-    IMAGE_PATH  = os.path.join(data_path, 'images')
-    SYMPTOM_CSV = os.path.join(data_path, 'symptoms.csv')
+    if data_path:
+        DATA_PATH   = data_path
+        IMAGE_PATH  = os.path.join(data_path, 'images')
+        SYMPTOM_CSV = os.path.join(data_path, 'symptoms.csv')
 
-    img_data             = load_all_images()
-    X_sym, y, scaler, le = load_symptoms()
-    sym_data             = split_symptoms(X_sym, y)
+    img_data       = load_all_images()
+    X_sym, y, scaler = load_symptoms()
+    sym_data       = split_symptoms(X_sym, y)
 
-    print("\n✅ Preprocessing selesai!")
+    print("\n[OK] Preprocessing selesai!")
     return {
         'images'  : img_data,
         'symptoms': sym_data,
         'scaler'  : scaler,
-        'encoder' : le,
         'classes' : CLASSES,
     }
 
 
+def pair_images_with_symptoms(X_img, y_img, X_sym, y_sym, seed=42):
+    """
+    Memasangkan citra dengan vektor gejala SECARA ACAK namun TETAP
+    SEKELAS (label sama), karena jumlah baris kedua modalitas berbeda.
+
+    Untuk setiap citra, dipilih satu baris gejala acak dari kelas yang sama.
+
+    Return:
+        X_img (tidak berubah), X_sym_paired (N_img, n_fitur), y (N_img,)
+    """
+    rng = np.random.default_rng(seed)
+    X_sym_paired = np.zeros((len(y_img), X_sym.shape[1]), dtype=np.float32)
+
+    for cls in np.unique(y_img):
+        idx_img = np.where(y_img == cls)[0]
+        idx_sym = np.where(y_sym == cls)[0]
+        if len(idx_sym) == 0:
+            raise ValueError(f"Tidak ada data gejala untuk kelas {cls}")
+        chosen = rng.choice(idx_sym, size=len(idx_img), replace=True)
+        X_sym_paired[idx_img] = X_sym[chosen]
+
+    return X_img, X_sym_paired, y_img
+
+
 # ─────────────────────────────────────────────
-# QUICK TEST — jalankan langsung untuk verifikasi
+# QUICK TEST
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     data = load_data()
 
-    print("\n─── Ringkasan Data ───")
-    for split in ['X_train', 'X_val', 'X_test']:
-        img  = data['images'][split]
-        sym  = data['symptoms'][split]
-        print(f"  {split:10s} | citra: {img.shape} | gejala: {sym.shape}")
+    print("\n--- Ringkasan Data Citra ---")
+    for cls in CLASSES:
+        idx = CLASSES.index(cls)
+        n_train = int(np.sum(data['images']['y_train'] == idx))
+        n_test  = int(np.sum(data['images']['y_test']  == idx))
+        print(f"  {cls:10s} | train: {n_train:4d} | test: {n_test:4d}")
+
+    print("\n--- Ringkasan Data Gejala ---")
+    for cls in CLASSES:
+        idx = CLASSES.index(cls)
+        n_train = int(np.sum(data['symptoms']['y_train'] == idx))
+        n_test  = int(np.sum(data['symptoms']['y_test']  == idx))
+        print(f"  {cls:10s} | train: {n_train:4d} | test: {n_test:4d}")

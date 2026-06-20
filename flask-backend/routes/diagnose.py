@@ -9,6 +9,7 @@ Menghasilkan 3 hasil diagnosis sekaligus:
 
 import os
 import uuid
+import pickle
 import numpy as np
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -19,6 +20,23 @@ from extensions import db
 from models import Diagnosis, ModelVersion
 
 diagnose_bp = Blueprint('diagnose', __name__)
+
+SCALER_PATH = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    '..', 'model', 'scaler.pkl'
+))
+_scaler = None
+
+def get_scaler():
+    global _scaler
+    if _scaler is None:
+        if os.path.exists(SCALER_PATH):
+            try:
+                with open(SCALER_PATH, 'rb') as f:
+                    _scaler = pickle.load(f)
+            except Exception as e:
+                print(f"[SCALER] Gagal memuat scaler: {e}")
+    return _scaler
 
 # ─────────────────────────────────────────────
 # KONFIGURASI
@@ -95,15 +113,31 @@ def preprocess_image(filepath: str) -> np.ndarray:
 
 
 def preprocess_symptoms(data) -> np.ndarray:
-    """Susun vektor gejala klinis (1, 6)."""
-    durasi_norm = (float(data.get('durasi_demam', 4)) - 4.0) / 1.2
+    """Susun vektor gejala klinis (1, 13)."""
+    durasi_demam = float(data.get('durasi_demam', 4))
+    scaler = get_scaler()
+    if scaler is not None:
+        try:
+            durasi_norm = float(scaler.transform([[durasi_demam]])[0][0])
+        except Exception:
+            durasi_norm = (durasi_demam - 4.0) / 1.2
+    else:
+        durasi_norm = (durasi_demam - 4.0) / 1.2
+
     return np.array([[
         durasi_norm,
-        int(data.get('batuk',            0)),
-        int(data.get('mata_merah',       0)),
-        int(data.get('kelenjar_bengkak', 0)),
-        int(data.get('pola_ruam',        0)),
-        int(data.get('vesikel',          0)),
+        int(data.get('demam_tinggi',       0)),
+        int(data.get('batuk',              0)),
+        int(data.get('pilek',              0)),
+        int(data.get('sakit_tenggorokan',  0)),
+        int(data.get('mata_merah',         0)), # Maps to konjungtivitis
+        int(data.get('koplik_spot',        0)),
+        int(data.get('kelenjar_bengkak',   0)),
+        int(data.get('pola_ruam',          0)), # Maps to ruam_wajah_ke_leher
+        int(data.get('nyeri_sendi',        0)),
+        int(data.get('vesikel',            0)),
+        int(data.get('hilang_nafsu_makan', 0)),
+        int(data.get('lemas',              0))
     ]], dtype=np.float32)
 
 
@@ -252,11 +286,18 @@ def predict():
         model_id         = model_version.id if model_version else None,
         foto_path        = filename,
         durasi_demam     = int(request.form.get('durasi_demam', 4)),
+        demam_tinggi     = bool(int(request.form.get('demam_tinggi',     0))),
         batuk            = bool(int(request.form.get('batuk',            0))),
+        pilek            = bool(int(request.form.get('pilek',            0))),
+        sakit_tenggorokan= bool(int(request.form.get('sakit_tenggorokan', 0))),
         mata_merah       = bool(int(request.form.get('mata_merah',       0))),
+        koplik_spot      = bool(int(request.form.get('koplik_spot',      0))),
         kelenjar_bengkak = bool(int(request.form.get('kelenjar_bengkak', 0))),
         pola_ruam        = bool(int(request.form.get('pola_ruam',        0))),
+        nyeri_sendi      = bool(int(request.form.get('nyeri_sendi',      0))),
         vesikel          = bool(int(request.form.get('vesikel',          0))),
+        hilang_nafsu_makan=bool(int(request.form.get('hilang_nafsu_makan',0))),
+        lemas            = bool(int(request.form.get('lemas',            0))),
         hasil            = hasil,
         confidence       = confidence,
         prob_campak      = fusion['probabilitas']['campak']  / 100,

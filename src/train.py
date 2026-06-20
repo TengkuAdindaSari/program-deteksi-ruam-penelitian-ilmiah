@@ -1,316 +1,436 @@
 """
 train.py
 ========
-Script training model Multi-Modal klasifikasi penyakit ruam kulit.
-Menggabungkan data citra (CNN) dan gejala klinis (MLP).
+Script training model Multi-Modal FusionNet (MobileNetV2 CNN + MLP)
+untuk klasifikasi penyakit ruam kulit: Campak, Rubella, Cacar Air.
 
-Cara menjalankan (dari root folder):
-    (venv) D:\program pi> python src\train.py
+Skema split      : 80% train, 20% test (gambar sudah ada di folder terpisah)
+Validasi internal: 10% diambil dari data train saat runtime
+Augmentasi online: Flip, rotasi, brightness via tf.data pipeline (data train saja)
 
-Output:
-    - model terbaik    : model\best_model.h5
-    - grafik training  : model\training_history.png
-    - laporan evaluasi : model\evaluation_report.txt
+Alur Training 2-Phase:
+  - Phase 1 (30 epoch): Backbone MobileNetV2 di-freeze, hanya head yang dilatih
+  - Phase 2 (20 epoch): Fine-tuning 30 layer terakhir backbone dengan LR sangat kecil
+
+Output yang dihasilkan (di folder model/):
+  - best_model.keras          <- Model dengan val_accuracy terbaik
+  - final_model.keras         <- Model dari akhir training Phase 2
+  - scaler.pkl                <- StandardScaler untuk normalisasi durasi_demam
+  - history_phase1_frozen.png <- Kurva akurasi/loss Phase 1
+  - history_phase2_finetune.png <- Kurva akurasi/loss Phase 2
+  - confusion_matrix.png      <- Confusion matrix test set
+  - evaluation_report.txt     <- Classification report lengkap
+
+Cara menjalankan (dari root folder project):
+    (venv) python src/train.py
 """
 
 import os
 import sys
+import pickle
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend agar tidak perlu display
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, confusion_matrix
 import seaborn as sns
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 import tensorflow as tf
 from tensorflow.keras.callbacks import (
-    ModelCheckpoint, EarlyStopping,
-    ReduceLROnPlateau, TensorBoard
+    ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, TensorBoard
 )
 
-# ── Path otomatis ──
+# ── Path otomatis berdasarkan lokasi file ini ──────────────────────────────
 SRC_DIR  = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(SRC_DIR)
 sys.path.insert(0, SRC_DIR)
 
-from preprocessing  import load_data
+from preprocessing import load_data, pair_images_with_symptoms
 from model_fusion   import build_fusion_model, compile_model, unfreeze_for_finetuning
 
 
-# ─────────────────────────────────────────────
-# KONFIGURASI TRAINING
-# ─────────────────────────────────────────────
+# =============================================================================
+# KONFIGURASI TRAINING — Ubah nilai di sini jika perlu
+# =============================================================================
+BATCH_SIZE         = 16
+EPOCHS_PHASE1      = 30       # Phase 1: backbone frozen
+EPOCHS_PHASE2      = 20       # Phase 2: fine-tuning
+VAL_SPLIT          = 0.10     # 10% dari data train untuk validasi internal
 
-BATCH_SIZE      = 16
-EPOCHS_PHASE1   = 30    # training awal (backbone frozen)
-EPOCHS_PHASE2   = 20    # fine-tuning (backbone sebagian dibuka)
-MODEL_DIR       = os.path.join(ROOT_DIR, 'model')
-CLASSES         = ['campak', 'rubella', 'cacar']
+PATIENCE_EARLY_P1  = 8        # EarlyStopping patience Phase 1
+PATIENCE_EARLY_P2  = 8        # EarlyStopping patience Phase 2
+PATIENCE_LR        = 4        # ReduceLROnPlateau patience
+LR_FACTOR          = 0.5      # Faktor pengurangan LR
 
+# Jumlah layer backbone yang dibuka di Phase 2 (dari ujung, total ~155 layer)
+NUM_UNFREEZE       = 30
+
+CLASSES    = ['campak', 'rubella', 'cacar']
+MODEL_DIR  = os.path.join(ROOT_DIR, 'model')
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-
-# ─────────────────────────────────────────────
-# HELPER: BUAT DATASET TENSORFLOW
-# ─────────────────────────────────────────────
-
-def align_symptom_data(X_sym, target_size):
-    """
-    Sejajarkan jumlah sampel gejala dengan jumlah sampel citra.
-    Jika X_sym lebih kecil, ulangi/tile data dengan seed tetap.
-    
-    Parameter:
-        X_sym       : array gejala (N_sym, features)
-        target_size : jumlah sampel target (N_img)
-    
-    Return:
-        X_sym_aligned : array gejala yang sudah disejajarkan (target_size, features)
-    """
-    if len(X_sym) == target_size:
-        return X_sym
-    elif len(X_sym) < target_size:
-        # Ulangi gejala sampai mencapai ukuran target
-        n_repeats = target_size // len(X_sym) + 1
-        X_sym_repeated = np.tile(X_sym, (n_repeats, 1))
-        X_sym_aligned = X_sym_repeated[:target_size]
-        print(f"  ⚠️  Gejala diulang: {len(X_sym)} → {target_size} sampel")
-        return X_sym_aligned
-    else:
-        # Sampel gejala lebih banyak (jarang terjadi)
-        return X_sym[:target_size]
+SEED = 42
+tf.random.set_seed(SEED)
+np.random.seed(SEED)
 
 
-def make_dataset(X_img, X_sym, y, batch_size, shuffle=True):
+# =============================================================================
+# DATA AUGMENTATION ONLINE (hanya untuk data TRAIN via tf.data)
+# =============================================================================
+def augment_image(image):
     """
-    Buat tf.data.Dataset dari array numpy.
-    Lebih efisien dari fit() langsung dengan numpy array besar.
+    Augmentasi online ringan pada citra saat training.
+    Input sudah di-normalize [0,1]. Model akan menge-scale ulang ke [-1,1].
     """
-    # Sejajarkan gejala dengan citra
-    X_sym = align_symptom_data(X_sym, len(X_img))
-    
+    image = tf.image.random_flip_left_right(image)
+    image = tf.image.random_flip_up_down(image)
+    image = tf.image.random_brightness(image, max_delta=0.15)
+    image = tf.image.random_contrast(image, lower=0.85, upper=1.15)
+    image = tf.image.random_saturation(image, lower=0.85, upper=1.15)
+    image = tf.clip_by_value(image, 0.0, 1.0)
+    return image
+
+
+# =============================================================================
+# HELPER: BUAT tf.data.Dataset
+# =============================================================================
+def make_dataset(X_img, X_sym, y, batch_size: int, shuffle: bool = True,
+                 augment: bool = False) -> tf.data.Dataset:
+    """
+    Membuat tf.data.Dataset yang efisien dengan prefetch.
+
+    Args:
+        X_img   : ndarray gambar (N, 224, 224, 3), float32 [0,1]
+        X_sym   : ndarray gejala (N, 13), float32
+        y       : ndarray label int64 (N,)
+        shuffle : acak urutan data (True untuk train)
+        augment : terapkan augmentasi online (True untuk train)
+    """
     ds = tf.data.Dataset.from_tensor_slices(
         ({'input_citra': X_img, 'input_gejala': X_sym}, y)
     )
     if shuffle:
-        ds = ds.shuffle(buffer_size=len(y), seed=42)
-    ds = ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
-    return ds
+        ds = ds.shuffle(buffer_size=len(y), seed=SEED, reshuffle_each_iteration=True)
+    if augment:
+        def apply_aug(inputs, label):
+            inputs['input_citra'] = augment_image(inputs['input_citra'])
+            return inputs, label
+        ds = ds.map(apply_aug, num_parallel_calls=tf.data.AUTOTUNE)
+    return ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
 
-# ─────────────────────────────────────────────
-# HELPER: PLOT HISTORY
-# ─────────────────────────────────────────────
-
-def plot_history(history, phase_name='phase1'):
-    """Simpan grafik accuracy dan loss ke folder model/."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+# =============================================================================
+# HELPER: VISUALISASI HISTORY
+# =============================================================================
+def plot_history(history, phase_name: str = 'phase'):
+    """Simpan kurva akurasi dan loss ke file PNG."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle(f'Training History - {phase_name.replace("_", " ").title()}',
+                 fontsize=14, fontweight='bold')
 
     # Accuracy
-    axes[0].plot(history.history['accuracy'],     label='Train Accuracy')
-    axes[0].plot(history.history['val_accuracy'], label='Val Accuracy')
-    axes[0].set_title(f'Accuracy — {phase_name}')
-    axes[0].set_xlabel('Epoch')
-    axes[0].set_ylabel('Accuracy')
-    axes[0].legend()
-    axes[0].grid(True)
+    ax1.plot(history.history['accuracy'],     label='Train', color='#4ECDC4', linewidth=2)
+    ax1.plot(history.history['val_accuracy'], label='Validasi', color='#FF4B4B', linewidth=2, linestyle='--')
+    ax1.set_title('Akurasi per Epoch')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Accuracy')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    ax1.set_ylim([0, 1.05])
 
     # Loss
-    axes[1].plot(history.history['loss'],     label='Train Loss')
-    axes[1].plot(history.history['val_loss'], label='Val Loss')
-    axes[1].set_title(f'Loss — {phase_name}')
-    axes[1].set_xlabel('Epoch')
-    axes[1].set_ylabel('Loss')
-    axes[1].legend()
-    axes[1].grid(True)
+    ax2.plot(history.history['loss'],     label='Train', color='#4ECDC4', linewidth=2)
+    ax2.plot(history.history['val_loss'], label='Validasi', color='#FF4B4B', linewidth=2, linestyle='--')
+    ax2.set_title('Loss per Epoch')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Loss')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
     save_path = os.path.join(MODEL_DIR, f'history_{phase_name}.png')
-    plt.savefig(save_path, dpi=150)
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"  Grafik disimpan: {save_path}")
+    print(f"  Grafik disimpan : {save_path}")
 
 
-# ─────────────────────────────────────────────
-# HELPER: EVALUASI & LAPORAN
-# ─────────────────────────────────────────────
+# =============================================================================
+# HELPER: EVALUASI LENGKAP
+# =============================================================================
+def evaluate_and_report(model, ds_test, X_img_test, X_sym_test, y_test):
+    """Evaluasi model pada test set dan simpan laporan + confusion matrix."""
+    print("\n" + "=" * 60)
+    print("  EVALUASI AKHIR (TEST SET)")
+    print("=" * 60)
 
-def evaluate_model(model, ds_test, X_img_test, X_sym_test, y_test):
-    """
-    Evaluasi model pada data test.
-    Simpan classification report dan confusion matrix.
-    """
-    print("\n=== EVALUASI MODEL ===")
-
-    # Sejajarkan gejala dengan citra sebelum prediksi
-    X_sym_test = align_symptom_data(X_sym_test, len(X_img_test))
-    
     # Prediksi
     y_pred_prob = model.predict(
         {'input_citra': X_img_test, 'input_gejala': X_sym_test},
-        verbose=0
+        verbose=1
     )
     y_pred = np.argmax(y_pred_prob, axis=1)
 
-    # Akurasi test
+    # Metrik dari dataset TF (lebih akurat karena pakai loss yg sama saat training)
     test_loss, test_acc = model.evaluate(ds_test, verbose=0)
-    print(f"  Test Loss    : {test_loss:.4f}")
-    print(f"  Test Accuracy: {test_acc:.4f} ({test_acc*100:.2f}%)")
+    print(f"\n  Test Loss        : {test_loss:.4f}")
+    print(f"  Test Accuracy    : {test_acc:.4f}  ({test_acc * 100:.2f}%)")
 
     # Classification Report
-    report = classification_report(y_test, y_pred, target_names=CLASSES)
+    report = classification_report(y_test, y_pred, target_names=CLASSES, digits=4)
     print("\n  Classification Report:")
     print(report)
 
-    # Simpan laporan ke file
+    # Simpan ke file teks
     report_path = os.path.join(MODEL_DIR, 'evaluation_report.txt')
-    with open(report_path, 'w') as f:
-        f.write(f"Test Loss    : {test_loss:.4f}\n")
-        f.write(f"Test Accuracy: {test_acc:.4f} ({test_acc*100:.2f}%)\n\n")
+    with open(report_path, 'w', encoding='utf-8') as f:
+        f.write("=" * 60 + "\n")
+        f.write("  HASIL EVALUASI MODEL FUSIONNET (MobileNetV2 + MLP)\n")
+        f.write("=" * 60 + "\n\n")
+        f.write(f"Test Loss        : {test_loss:.4f}\n")
+        f.write(f"Test Accuracy    : {test_acc:.4f}  ({test_acc * 100:.2f}%)\n\n")
         f.write("Classification Report:\n")
         f.write(report)
-    print(f"  Laporan disimpan: {report_path}")
+    print(f"  Laporan evaluasi : {report_path}")
 
     # Confusion Matrix
     cm = confusion_matrix(y_test, y_pred)
-    plt.figure(figsize=(7, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=CLASSES, yticklabels=CLASSES)
-    plt.title('Confusion Matrix')
-    plt.xlabel('Prediksi')
-    plt.ylabel('Aktual')
+    fig, ax = plt.subplots(figsize=(7, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+                xticklabels=[c.capitalize() for c in CLASSES],
+                yticklabels=[c.capitalize() for c in CLASSES],
+                linewidths=0.5, annot_kws={"size": 14})
+    ax.set_title('Confusion Matrix - Test Set', fontsize=13, fontweight='bold')
+    ax.set_xlabel('Prediksi', fontsize=12)
+    ax.set_ylabel('Aktual', fontsize=12)
     plt.tight_layout()
     cm_path = os.path.join(MODEL_DIR, 'confusion_matrix.png')
-    plt.savefig(cm_path, dpi=150)
+    plt.savefig(cm_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"  Confusion matrix disimpan: {cm_path}")
+    print(f"  Confusion matrix : {cm_path}")
 
     return test_acc
 
 
-# ─────────────────────────────────────────────
-# MAIN TRAINING
-# ─────────────────────────────────────────────
-
+# =============================================================================
+# MAIN — ALUR TRAINING LENGKAP
+# =============================================================================
 def main():
     print("=" * 60)
-    print("  TRAINING MULTIMODAL SKIN RASH CLASSIFIER")
+    print("  TRAINING FUSIONNET — MobileNetV2 + MLP FUSION")
+    print("  Klasifikasi Ruam Kulit: Campak | Rubella | Cacar Air")
     print("=" * 60)
 
-    # ── 1. Load Data ──
-    print("\n[1/5] Memuat dataset...")
-    data     = load_data(os.path.join(ROOT_DIR, 'data'))
-    img_data = data['images']
-    sym_data = data['symptoms']
+    # ------------------------------------------------------------------
+    # LANGKAH 1: Load dataset (citra dari folder + gejala dari CSV)
+    # ------------------------------------------------------------------
+    print("\n[1/7] Memuat dataset citra & gejala klinis...")
+    data    = load_data(os.path.join(ROOT_DIR, 'data'))
+    img_full = data['images']    # {'X_train', 'y_train', 'X_test', 'y_test'}
+    sym_full = data['symptoms']  # {'X_train', 'y_train', 'X_test', 'y_test'}
+    scaler   = data['scaler']
 
-    X_img_train = img_data['X_train']
-    X_img_val   = img_data['X_val']
-    X_img_test  = img_data['X_test']
+    print(f"\n  Citra  train : {img_full['X_train'].shape}")
+    print(f"  Citra  test  : {img_full['X_test'].shape}")
+    print(f"  Gejala train : {sym_full['X_train'].shape}")
+    print(f"  Gejala test  : {sym_full['X_test'].shape}")
 
-    X_sym_train = sym_data['X_train']
-    X_sym_val   = sym_data['X_val']
-    X_sym_test  = sym_data['X_test']
+    # ------------------------------------------------------------------
+    # LANGKAH 2: Pairing citra <-> gejala (per kelas, random sampling)
+    # ------------------------------------------------------------------
+    print("\n[2/7] Memasangkan citra dengan gejala per kelas...")
+    X_img_tr_full, X_sym_tr_full, y_tr_full = pair_images_with_symptoms(
+        img_full['X_train'], img_full['y_train'],
+        sym_full['X_train'], sym_full['y_train'], seed=SEED
+    )
+    X_img_test, X_sym_test, y_test = pair_images_with_symptoms(
+        img_full['X_test'], img_full['y_test'],
+        sym_full['X_test'], sym_full['y_test'], seed=SEED + 1
+    )
+    print(f"  Pasangan train: {len(y_tr_full):,} | test: {len(y_test):,}")
 
-    y_train = img_data['y_train']
-    y_val   = img_data['y_val']
-    y_test  = img_data['y_test']
+    # ------------------------------------------------------------------
+    # LANGKAH 3: Split internal train -> train + validasi
+    # ------------------------------------------------------------------
+    print(f"\n[3/7] Split internal train/validasi ({int((1-VAL_SPLIT)*100)}/{int(VAL_SPLIT*100)})...")
+    idx_tr, idx_val = train_test_split(
+        np.arange(len(y_tr_full)),
+        test_size=VAL_SPLIT,
+        stratify=y_tr_full,
+        random_state=SEED
+    )
+    X_img_tr   = X_img_tr_full[idx_tr]
+    X_sym_tr   = X_sym_tr_full[idx_tr]
+    y_tr       = y_tr_full[idx_tr]
+    X_img_val  = X_img_tr_full[idx_val]
+    X_sym_val  = X_sym_tr_full[idx_val]
+    y_val      = y_tr_full[idx_val]
 
     print(f"\n  Ringkasan data:")
-    print(f"  Train : {len(y_train)} sampel")
-    print(f"  Val   : {len(y_val)} sampel")
-    print(f"  Test  : {len(y_test)} sampel")
+    print(f"    Train aktif  : {len(y_tr):,} sampel")
+    print(f"    Validasi     : {len(y_val):,} sampel")
+    print(f"    Test         : {len(y_test):,} sampel")
+    print(f"    Total        : {len(y_tr) + len(y_val) + len(y_test):,} sampel")
 
-    # ── 2. Buat Dataset ──
-    print("\n[2/5] Membuat tf.data.Dataset...")
-    ds_train = make_dataset(X_img_train, X_sym_train, y_train, BATCH_SIZE, shuffle=True)
-    ds_val   = make_dataset(X_img_val,   X_sym_val,   y_val,   BATCH_SIZE, shuffle=False)
-    ds_test  = make_dataset(X_img_test,  X_sym_test,  y_test,  BATCH_SIZE, shuffle=False)
+    # ------------------------------------------------------------------
+    # LANGKAH 4: Buat tf.data.Dataset (augmentasi online untuk train)
+    # ------------------------------------------------------------------
+    print("\n[4/7] Membuat tf.data pipeline (augmentasi online aktif untuk train)...")
+    ds_train = make_dataset(X_img_tr,  X_sym_tr,  y_tr,  BATCH_SIZE, shuffle=True,  augment=True)
+    ds_val   = make_dataset(X_img_val, X_sym_val, y_val, BATCH_SIZE, shuffle=False, augment=False)
+    ds_test  = make_dataset(X_img_test, X_sym_test, y_test, BATCH_SIZE, shuffle=False, augment=False)
 
-    # ── 3. Bangun Model ──
-    print("\n[3/5] Membangun model...")
+    # Class weights untuk menangani imbalance
+    class_weights_arr = compute_class_weight(
+        class_weight='balanced',
+        classes=np.array([0, 1, 2]),
+        y=y_tr
+    )
+    class_weight_dict = dict(enumerate(class_weights_arr))
+    print(f"\n  Class weights (balance otomatis):")
+    for idx, cls in enumerate(CLASSES):
+        print(f"    {cls:10s}: {class_weight_dict[idx]:.4f}")
+
+    # ------------------------------------------------------------------
+    # LANGKAH 5: Bangun model FusionNet baru
+    # ------------------------------------------------------------------
+    print("\n[5/7] Membangun model FusionNet (MobileNetV2 frozen + MLP)...")
     model = build_fusion_model()
     model = compile_model(model)
-    print(f"  Total parameter: {model.count_params():,}")
+    print(f"  Arsitektur  : FusionNet_MobileNetV2_MLP")
+    print(f"  Total param : {model.count_params():,}")
+    print(f"  Input citra : {model.input_shape[0]}")
+    print(f"  Input gejala: {model.input_shape[1]}")
 
-    # ── 4. PHASE 1: Training Awal (backbone frozen) ──
-    print(f"\n[4/5] PHASE 1 — Training awal ({EPOCHS_PHASE1} epoch, backbone frozen)")
+    # ------------------------------------------------------------------
+    # LANGKAH 6: PHASE 1 — Training head (backbone frozen)
+    # ------------------------------------------------------------------
+    best_model_path = os.path.join(MODEL_DIR, 'best_model.keras')
+    print(f"\n[6/7] PHASE 1 - Training Head ({EPOCHS_PHASE1} epoch, backbone frozen)")
+    print(f"  LR awal      : 1e-4")
+    print(f"  Batch size   : {BATCH_SIZE}")
+    print(f"  Checkpoint   : {best_model_path}")
+    print("-" * 60)
 
     callbacks_p1 = [
         ModelCheckpoint(
-            filepath        = os.path.join(MODEL_DIR, 'best_model.keras'),
-            monitor         = 'val_accuracy',
-            save_best_only  = True,
-            verbose         = 1
+            filepath=best_model_path,
+            monitor='val_accuracy',
+            save_best_only=True,
+            verbose=1,
+            mode='max'
         ),
         EarlyStopping(
-            monitor         = 'val_accuracy',
-            patience        = 8,
-            restore_best_weights = True,
-            verbose         = 1
+            monitor='val_accuracy',
+            patience=PATIENCE_EARLY_P1,
+            restore_best_weights=True,
+            verbose=1,
+            mode='max'
         ),
         ReduceLROnPlateau(
-            monitor         = 'val_loss',
-            factor          = 0.5,
-            patience        = 4,
-            min_lr          = 1e-7,
-            verbose         = 1
+            monitor='val_loss',
+            factor=LR_FACTOR,
+            patience=PATIENCE_LR,
+            min_lr=1e-7,
+            verbose=1
         ),
     ]
 
     history_p1 = model.fit(
         ds_train,
-        validation_data = ds_val,
-        epochs          = EPOCHS_PHASE1,
-        callbacks       = callbacks_p1,
-        verbose         = 1
+        validation_data=ds_val,
+        epochs=EPOCHS_PHASE1,
+        callbacks=callbacks_p1,
+        class_weight=class_weight_dict,
+        verbose=1
     )
-
     plot_history(history_p1, phase_name='phase1_frozen')
 
-    # ── 5. PHASE 2: Fine-tuning ──
-    print(f"\n[5/5] PHASE 2 — Fine-tuning ({EPOCHS_PHASE2} epoch, backbone sebagian dibuka)")
+    best_p1_acc = max(history_p1.history['val_accuracy'])
+    print(f"\n  [Phase 1] Selesai. Best val_accuracy: {best_p1_acc:.4f} ({best_p1_acc*100:.2f}%)")
 
-    model = unfreeze_for_finetuning(model, num_layers_to_unfreeze=30)
+    # ------------------------------------------------------------------
+    # LANGKAH 7: PHASE 2 — Fine-tuning MobileNetV2 (N layer terakhir)
+    # ------------------------------------------------------------------
+    print(f"\n[7/7] PHASE 2 - Fine-tuning ({EPOCHS_PHASE2} epoch, {NUM_UNFREEZE} layer backbone dibuka)")
+    print(f"  LR fine-tune : 1e-5 (10x lebih kecil dari Phase 1)")
+    print("-" * 60)
+
+    model = unfreeze_for_finetuning(model, num_layers_to_unfreeze=NUM_UNFREEZE)
 
     callbacks_p2 = [
         ModelCheckpoint(
-            filepath        = os.path.join(MODEL_DIR, 'best_model.keras'),
-            monitor         = 'val_accuracy',
-            save_best_only  = True,
-            verbose         = 1
+            filepath=best_model_path,
+            monitor='val_accuracy',
+            save_best_only=True,
+            verbose=1,
+            mode='max'
         ),
         EarlyStopping(
-            monitor         = 'val_accuracy',
-            patience        = 6,
-            restore_best_weights = True,
-            verbose         = 1
+            monitor='val_accuracy',
+            patience=PATIENCE_EARLY_P2,
+            restore_best_weights=True,
+            verbose=1,
+            mode='max'
         ),
         ReduceLROnPlateau(
-            monitor         = 'val_loss',
-            factor          = 0.5,
-            patience        = 3,
-            min_lr          = 1e-8,
-            verbose         = 1
+            monitor='val_loss',
+            factor=LR_FACTOR,
+            patience=PATIENCE_LR,
+            min_lr=1e-8,
+            verbose=1
         ),
     ]
 
     history_p2 = model.fit(
         ds_train,
-        validation_data = ds_val,
-        epochs          = EPOCHS_PHASE2,
-        callbacks       = callbacks_p2,
-        verbose         = 1
+        validation_data=ds_val,
+        epochs=EPOCHS_PHASE2,
+        callbacks=callbacks_p2,
+        class_weight=class_weight_dict,
+        verbose=1
     )
-
     plot_history(history_p2, phase_name='phase2_finetune')
 
-    # ── 6. Evaluasi ──
-    evaluate_model(model, ds_test, X_img_test, X_sym_test, y_test)
+    best_p2_acc = max(history_p2.history['val_accuracy'])
+    print(f"\n  [Phase 2] Selesai. Best val_accuracy: {best_p2_acc:.4f} ({best_p2_acc*100:.2f}%)")
 
-    # ── 7. Simpan Model Final ──
+    # ------------------------------------------------------------------
+    # EVALUASI FINAL pada test set
+    # ------------------------------------------------------------------
+    print("\nMemuat model terbaik dari checkpoint untuk evaluasi...")
+    best_model = tf.keras.models.load_model(best_model_path)
+    final_test_acc = evaluate_and_report(best_model, ds_test, X_img_test, X_sym_test, y_test)
+
+    # ------------------------------------------------------------------
+    # SIMPAN MODEL FINAL + SCALER
+    # ------------------------------------------------------------------
     final_path = os.path.join(MODEL_DIR, 'final_model.keras')
-    model.save(final_path)
-    print(f"\nModel final disimpan: {final_path}")
+    best_model.save(final_path)
+    print(f"\n  Model final disimpan : {final_path}")
 
+    scaler_path = os.path.join(MODEL_DIR, 'scaler.pkl')
+    with open(scaler_path, 'wb') as f:
+        pickle.dump(scaler, f)
+    print(f"  Scaler disimpan      : {scaler_path}")
+
+    # ------------------------------------------------------------------
+    # RINGKASAN AKHIR
+    # ------------------------------------------------------------------
     print("\n" + "=" * 60)
     print("  TRAINING SELESAI!")
-    print(f"  Cek folder: {MODEL_DIR}")
+    print("=" * 60)
+    print(f"  Best val_accuracy Phase 1 : {best_p1_acc*100:.2f}%")
+    print(f"  Best val_accuracy Phase 2 : {best_p2_acc*100:.2f}%")
+    print(f"  Test Accuracy (final)     : {final_test_acc*100:.2f}%")
+    print(f"\n  Output tersimpan di: {MODEL_DIR}")
+    print(f"    - best_model.keras")
+    print(f"    - final_model.keras")
+    print(f"    - scaler.pkl")
+    print(f"    - history_phase1_frozen.png")
+    print(f"    - history_phase2_finetune.png")
+    print(f"    - confusion_matrix.png")
+    print(f"    - evaluation_report.txt")
     print("=" * 60)
 
 

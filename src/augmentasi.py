@@ -1,20 +1,26 @@
 """
 augmentasi.py
 =============
-Membuat 30 variasi augmentasi untuk setiap gambar asli rubella.
+Augmentasi citra: setiap gambar asli menghasilkan 15 variasi baru.
+Berlaku untuk SEMUA kelas (campak, rubella, cacar) di folder TRAIN saja
+(sesuai skema split 80/20 — augmentasi tidak boleh masuk ke folder test).
 
-Hasil: 18 gambar asli × 30 augmentasi = 540 gambar baru
-       Total folder training = 18 + 540 = 558 gambar
+Struktur folder yang diharapkan (skema 80/20, hanya 2 split):
+    data/images/<kelas>/train/
+    data/images/<kelas>/test/
 
-Letakkan file ini di: src\augmentasi.py
+Letakkan file ini di: src/augmentasi.py
 Jalankan dari ROOT folder:
-    (venv) D:\program pi> python src\augmentasi.py
+    (venv) python src/augmentasi.py
 """
 
 import os
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
 import random
+
+random.seed(42)
+np.random.seed(42)
 
 # ─────────────────────────────────────────────
 # PATH OTOMATIS
@@ -29,9 +35,10 @@ print(f"Image folder: {IMAGE_BASE}")
 # ─────────────────────────────────────────────
 # KONFIGURASI
 # ─────────────────────────────────────────────
-TARGET        = {'rubella': ['training']}
-AUG_PER_IMAGE = 30
-VALID_EXT     = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
+CLASSES        = ['campak', 'rubella', 'cacar']
+TARGET_SPLIT   = 'train'        # augmentasi hanya pada folder train
+AUG_PER_IMAGE  = 15
+VALID_EXT      = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
 
 
 # ─────────────────────────────────────────────
@@ -78,77 +85,29 @@ def translate(img, dx, dy):
                          fillcolor=(200, 200, 200))
 
 
-# ─── 30 RESEP AUGMENTASI ───
+# ─── 15 RESEP AUGMENTASI (1 resep = 1 gambar baru per gambar asli) ───
 RECIPES = [
-    # 1  — flip horizontal
     [lambda img: flip_horizontal(img)],
-    # 2  — flip vertikal
     [lambda img: flip_vertical(img)],
-    # 3  — flip H + terang
     [lambda img: brightness(flip_horizontal(img), 1.3)],
-    # 4  — flip H + gelap
     [lambda img: brightness(flip_horizontal(img), 0.7)],
-    # 5  — rotasi -15
     [lambda img: rotate(img, -15)],
-    # 6  — rotasi +15
     [lambda img: rotate(img, 15)],
-    # 7  — rotasi -25
     [lambda img: rotate(img, -25)],
-    # 8  — rotasi +25
     [lambda img: rotate(img, 25)],
-    # 9  — rotasi + flip H
     [lambda img: flip_horizontal(rotate(img, 10))],
-    # 10 — zoom 85%
     [lambda img: zoom_in(img, 0.85)],
-    # 11 — zoom 80%
     [lambda img: zoom_in(img, 0.80)],
-    # 12 — zoom + terang
     [lambda img: brightness(zoom_in(img, 0.85), 1.2)],
-    # 13 — zoom + flip
-    [lambda img: flip_horizontal(zoom_in(img, 0.80))],
-    # 14 — contrast tinggi
-    [lambda img: contrast(img, 1.5)],
-    # 15 — contrast rendah
-    [lambda img: contrast(img, 0.6)],
-    # 16 — saturasi tinggi
-    [lambda img: saturation(img, 1.6)],
-    # 17 — saturasi rendah
-    [lambda img: saturation(img, 0.5)],
-    # 18 — blur ringan
+    [lambda img: contrast(img, 1.4)],
+    [lambda img: saturation(img, 1.5)],
     [lambda img: blur_img(img, 1.0)],
-    # 19 — blur + flip
-    [lambda img: flip_horizontal(blur_img(img, 1.2))],
-    # 20 — sharpen
-    [lambda img: sharpness(img, 2.5)],
-    # 21 — sharpen + flip
-    [lambda img: flip_horizontal(sharpness(img, 2.0))],
-    # 22 — noise ringan
-    [lambda img: noise(img, 15)],
-    # 23 — noise + terang
-    [lambda img: brightness(noise(img, 12), 1.1)],
-    # 24 — translate kiri
-    [lambda img: translate(img, -20, 0)],
-    # 25 — translate kanan
-    [lambda img: translate(img, 20, 0)],
-    # 26 — translate + rotasi
-    [lambda img: rotate(translate(img, 15, 10), 8)],
-    # 27 — flip + contrast + zoom
-    [lambda img: zoom_in(contrast(flip_horizontal(img), 1.3), 0.88)],
-    # 28 — rotasi + saturasi
-    [lambda img: saturation(rotate(img, -12), 1.4)],
-    # 29 — gelap + blur
-    [lambda img: blur_img(brightness(img, 0.75), 0.8)],
-    # 30 — terang + sharpen + flip
-    [lambda img: flip_horizontal(sharpness(brightness(img, 1.25), 1.8))],
 ]
 
 assert len(RECIPES) == AUG_PER_IMAGE, \
-    f"Jumlah resep ({len(RECIPES)}) harus sama dengan AUG_PER_IMAGE ({AUG_PER_IMAGE})"
+    f"Jumlah resep ({len(RECIPES)}) harus = AUG_PER_IMAGE ({AUG_PER_IMAGE})"
 
 
-# ─────────────────────────────────────────────
-# FUNGSI UTAMA
-# ─────────────────────────────────────────────
 def apply_recipe(img, recipe):
     result = img.copy()
     for fn in recipe:
@@ -157,13 +116,13 @@ def apply_recipe(img, recipe):
 
 
 def augment_folder(cls, split):
+    """Augmentasi semua gambar asli di folder data/images/<cls>/<split>/."""
     folder = os.path.join(IMAGE_BASE, cls, split)
 
     if not os.path.exists(folder):
         print(f"\n  [ERROR] Folder tidak ditemukan: {folder}")
-        return
+        return 0, 0
 
-    # Hanya ambil gambar ASLI (bukan aug_)
     originals = [
         f for f in sorted(os.listdir(folder))
         if os.path.splitext(f)[1].lower() in VALID_EXT
@@ -172,7 +131,7 @@ def augment_folder(cls, split):
 
     if not originals:
         print(f"\n  [SKIP] Tidak ada gambar asli di: {folder}")
-        return
+        return 0, 0
 
     total_baru = len(originals) * AUG_PER_IMAGE
     print(f"\n  Folder  : {folder}")
@@ -205,15 +164,17 @@ def augment_folder(cls, split):
 
     print(" selesai!")
     print(f"  Berhasil membuat {generated} gambar baru")
+    return len(originals), generated
 
 
 def cek_distribusi():
-    print("\n─── Distribusi Dataset Sekarang ───")
-    print(f"{'Kelas':<12} {'Training':>10} {'Validasi':>10} {'Test':>8}")
-    print("-" * 45)
-    for cls in ['campak', 'rubella', 'cacar']:
+    print("\n--- Distribusi Dataset Sekarang (80/20) ---")
+    print(f"{'Kelas':<12} {'Train':>10} {'Test':>10} {'Total':>10}")
+    print("-" * 46)
+    grand_total = 0
+    for cls in CLASSES:
         counts = {}
-        for split in ['training', 'validasi', 'test']:
+        for split in ['train', 'test']:
             folder = os.path.join(IMAGE_BASE, cls, split)
             if os.path.exists(folder):
                 files = [f for f in os.listdir(folder)
@@ -221,18 +182,27 @@ def cek_distribusi():
                 counts[split] = len(files)
             else:
                 counts[split] = 0
-        print(f"{cls:<12} {counts.get('training',0):>10} "
-              f"{counts.get('validasi',0):>10} {counts.get('test',0):>8}")
+        total = counts.get('train', 0) + counts.get('test', 0)
+        grand_total += total
+        print(f"{cls:<12} {counts.get('train',0):>10} {counts.get('test',0):>10} {total:>10}")
+    print("-" * 46)
+    print(f"{'TOTAL':<12} {'':>10} {'':>10} {grand_total:>10}")
 
 
 if __name__ == '__main__':
     print("=" * 55)
-    print("  AUGMENTASI DATASET — 30 variasi per gambar asli")
+    print("  AUGMENTASI DATASET - 15 variasi per gambar asli")
+    print("  (Hanya folder TRAIN - skema split 80/20)")
     print("=" * 55)
 
-    for cls, splits in TARGET.items():
+    summary = []
+    for cls in CLASSES:
         print(f"\n Kelas: {cls.upper()}")
-        for split in splits:
-            augment_folder(cls, split)
+        asli, aug = augment_folder(cls, TARGET_SPLIT)
+        summary.append((cls, asli, aug))
+
+    print("\n--- Ringkasan Augmentasi ---")
+    for cls, asli, aug in summary:
+        print(f"  {cls:10s}: {asli} asli -> +{aug} augmentasi -> {asli+aug} total di train/")
 
     cek_distribusi()

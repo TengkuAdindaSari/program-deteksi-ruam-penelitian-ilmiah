@@ -367,11 +367,18 @@ $konsistensiColor = [
                     $g     = $d['gejala'];
                     $items = [
                         'Durasi demam'               => $g['durasi_demam'] . ' hari',
-                        'Batuk'                      => $g['batuk'] ? 'Ya' : 'Tidak',
-                        'Mata merah'                 => $g['mata_merah'] ? 'Ya' : 'Tidak',
-                        'Kelenjar bengkak'           => $g['kelenjar_bengkak'] ? 'Ya' : 'Tidak',
-                        'Ruam wajah ke badan'        => $g['pola_ruam'] ? 'Ya' : 'Tidak',
-                        'Vesikel (gelembung cairan)' => $g['vesikel'] ? 'Ya' : 'Tidak',
+                        'Demam tinggi (>38.5°C)'     => ($g['demam_tinggi'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Batuk kering'               => ($g['batuk'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Pilek / hidung tersumbat'   => ($g['pilek'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Sakit tenggorokan'          => ($g['sakit_tenggorokan'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Mata merah'                 => ($g['mata_merah'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Bercak koplik di mulut'     => ($g['koplik_spot'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Kelenjar bengkak'           => ($g['kelenjar_bengkak'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Ruam wajah ke badan'        => ($g['pola_ruam'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Nyeri sendi'                => ($g['nyeri_sendi'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Vesikel (gelembung cairan)' => ($g['vesikel'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Hilang nafsu makan'         => ($g['hilang_nafsu_makan'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Badan lemas & cepat lelah'  => ($g['lemas'] ?? 0) ? 'Ya' : 'Tidak',
                     ];
                     foreach ($items as $label => $val):
                     ?>
@@ -441,11 +448,18 @@ $konsistensiColor = [
                     $g     = $d['gejala'];
                     $items = [
                         'Durasi demam'               => $g['durasi_demam'] . ' hari',
-                        'Batuk'                      => $g['batuk'] ? 'Ya' : 'Tidak',
-                        'Mata merah'                 => $g['mata_merah'] ? 'Ya' : 'Tidak',
-                        'Kelenjar bengkak'           => $g['kelenjar_bengkak'] ? 'Ya' : 'Tidak',
-                        'Ruam wajah ke badan'        => $g['pola_ruam'] ? 'Ya' : 'Tidak',
-                        'Vesikel (gelembung cairan)' => $g['vesikel'] ? 'Ya' : 'Tidak',
+                        'Demam tinggi (>38.5°C)'     => ($g['demam_tinggi'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Batuk kering'               => ($g['batuk'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Pilek / hidung tersumbat'   => ($g['pilek'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Sakit tenggorokan'          => ($g['sakit_tenggorokan'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Mata merah'                 => ($g['mata_merah'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Bercak koplik di mulut'     => ($g['koplik_spot'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Kelenjar bengkak'           => ($g['kelenjar_bengkak'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Ruam wajah ke badan'        => ($g['pola_ruam'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Nyeri sendi'                => ($g['nyeri_sendi'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Vesikel (gelembung cairan)' => ($g['vesikel'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Hilang nafsu makan'         => ($g['hilang_nafsu_makan'] ?? 0) ? 'Ya' : 'Tidak',
+                        'Badan lemas & cepat lelah'  => ($g['lemas'] ?? 0) ? 'Ya' : 'Tidak',
                     ];
                     foreach ($items as $label => $val):
                     ?>
