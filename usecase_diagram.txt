@@ -1,0 +1,70 @@
+Mermaid Use Case Diagram Code — DermDetect
+Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
+
+Salin blok kode di bawah ini mulai dari tulisan "flowchart LR" ke: https://mermaid.live
+
+================================================================================
+Use Case Diagram — DermDetect
+================================================================================
+
+flowchart LR
+    %% Aktor
+    USER((👤 Pengguna\nPasien))
+    ADMIN((🛡️ Administrator))
+    AI((🧠 Sistem AI\nBackend Model))
+
+    %% Batas Sistem (System Boundary)
+    subgraph SISTEM ["Sistem Aplikasi DermDetect"]
+        direction TB
+        
+        %% Use Cases
+        UC1([Registrasi Akun Baru])
+        UC2([Login / Autentikasi])
+        
+        UC3([Melakukan Diagnosa Ruam])
+        UC4([Melihat Hasil Diagnosa])
+        UC5([Melihat Riwayat Diagnosa])
+        UC6([Mengelola Profil Akun])
+        
+        UC7([Melihat Statistik Sistem])
+        UC8([Mengelola Data Pengguna])
+        
+        UC9([Memproses Prediksi Penyakit])
+        UC10([Logout])
+    end
+
+    %% Relasi Aktor - Use Case (Pengguna)
+    USER --- UC1
+    USER --- UC2
+    USER --- UC3
+    USER --- UC5
+    USER --- UC6
+    USER --- UC10
+
+    %% Relasi Aktor - Use Case (Admin)
+    ADMIN --- UC2
+    ADMIN --- UC7
+    ADMIN --- UC8
+    ADMIN --- UC10
+
+    %% Relasi Aktor - Use Case (Sistem AI)
+    UC9 --- AI
+
+    %% Relasi Include & Extend (Ketergantungan Use Case)
+    UC3 -.->|<<include>>| UC2
+    UC5 -.->|<<include>>| UC2
+    UC6 -.->|<<include>>| UC2
+    UC7 -.->|<<include>>| UC2
+    UC8 -.->|<<include>>| UC2
+    
+    UC3 -.->|<<include>>| UC9
+    UC9 -.->|<<include>>| UC4
+    
+    %% Styling Visual
+    classDef actor fill:#f3f4f6,stroke:#374151,stroke-width:2px,color:#000
+    classDef usecase fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px
+    classDef system fill:#ffffff,stroke:#9ca3af,stroke-width:2px,stroke-dasharray: 5 5
+    
+    class USER,ADMIN,AI actor
+    class UC1,UC2,UC3,UC4,UC5,UC6,UC7,UC8,UC9,UC10 usecase
+    class SISTEM system

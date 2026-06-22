@@ -71,450 +71,602 @@ $konsistensiColor = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hasil Diagnosis — DermDetect</title>
     <link rel="stylesheet" href="/assets/css/style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <style>
-        /* ── Triple Result Cards ── */
-        .triple-card {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            margin-bottom: 12px;
-        }
-        .triple-header {
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 1px solid var(--gray-100);
-        }
-        .triple-header .method-badge {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 10px;
-            border-radius: 99px;
-            margin-left: auto;
-        }
-        .triple-body { padding: 14px 16px; }
-
-        /* ── Result Pill ── */
-        .result-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 99px;
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 10px;
-        }
-
-        /* ── Mini Probability Bars ── */
-        .mini-prob  { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-        .mini-label { font-size: 11px; color: var(--gray-500); width: 70px; }
-        .mini-track { flex: 1; height: 6px; background: var(--gray-100); border-radius: 99px; overflow: hidden; }
-        .mini-fill  { height: 100%; border-radius: 99px; }
-        .mini-pct   { font-size: 11px; font-weight: 500; color: var(--gray-700); width: 38px; text-align: right; }
-
-        /* ── Fusion Banner ── */
-        .fusion-banner {
-            background: linear-gradient(135deg, #EFF6FF, #F0FDF4);
-            border: 2px solid #2563EB;
-            border-radius: var(--radius-lg);
-            padding: 20px;
-            margin-bottom: 16px;
-            text-align: center;
-        }
-        .fusion-title   { font-size: 12px; font-weight: 600; color: #2563EB; margin-bottom: 8px; letter-spacing: .05em; text-transform: uppercase; }
-        .fusion-disease { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
-        .fusion-conf    { font-size: 14px; color: var(--gray-600); }
-
-        /* ── Konsistensi Box ── */
-        .konsistensi-box {
-            border-radius: var(--radius);
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            font-weight: 500;
-        }
-
-        /* ── Comparison Table ── */
-        .comparison-row {
-            display: grid;
-            grid-template-columns: 110px 1fr 1fr 1fr;
-            gap: 8px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--gray-100);
-            align-items: center;
-            font-size: 12px;
-        }
-        .comparison-row:last-child { border-bottom: none; }
-        .comparison-header {
-            background: var(--gray-50);
-            border-radius: var(--radius);
-            font-weight: 600;
-            color: var(--gray-600);
-            padding: 8px !important;
-        }
+      .result-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        align-items: start;
+      }
+      .result-hero {
+        display: flex;
+        gap: 1.5rem;
+        background: white;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      .result-image-box {
+        width: 250px;
+        height: 250px;
+        border-radius: var(--radius-md);
+        background-color: var(--gray-100);
+        /* Default rash image if none provided */
+        background-image: url('https://images.unsplash.com/photo-1604164448130-d1df213c64eb?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80');
+        background-size: cover;
+        background-position: center;
+        position: relative;
+        flex-shrink: 0;
+      }
+      .result-image-box .badge-original {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        background: white;
+        padding: 6px 12px;
+        border-radius: 99px;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--primary-color);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      
+      .result-summary {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .result-summary .top-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--gray-500);
+        margin-bottom: 12px;
+      }
+      .result-summary .top-meta .badge {
+        background: var(--primary-color);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 10px;
+      }
+      .result-summary h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 8px;
+        line-height: 1.2;
+      }
+      .result-summary .confidence {
+        font-size: 1.1rem;
+        color: var(--gray-600);
+        margin-bottom: 24px;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      .result-summary .confidence strong {
+        font-weight: 700;
+        color: var(--text-primary);
+        font-size: 1.25rem;
+      }
+      .consistency-alert {
+        background: #f8fafc;
+        border-radius: var(--radius-md);
+        padding: 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .consistency-alert.high {
+        background: #f0fdfa;
+      }
+      .consistency-alert .icon-circle {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #0f3b99;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .consistency-alert h4 {
+        margin: 0 0 4px 0;
+        font-size: 14px;
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .consistency-alert p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+      
+      .table-card, .info-disease-card {
+        background: white;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      
+      .table-card h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        margin-bottom: 16px;
+        color: var(--text-primary);
+      }
+      
+      .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .comparison-table th {
+        text-align: left;
+        padding: 12px 16px;
+        background: var(--gray-50);
+        font-size: 12px;
+        color: var(--gray-500);
+        font-weight: 600;
+      }
+      .comparison-table td {
+        padding: 16px;
+        border-top: 1px solid var(--gray-100);
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+      
+      .analysis-cards-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+      }
+      
+      .analysis-mini-card {
+        background: white;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        padding: 1.5rem;
+      }
+      .analysis-mini-card h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        margin-bottom: 16px;
+        color: var(--text-primary);
+      }
+      .bar-row {
+        margin-bottom: 12px;
+      }
+      .bar-row:last-child {
+        margin-bottom: 0;
+      }
+      .bar-label-group {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-bottom: 6px;
+        color: var(--gray-600);
+      }
+      .bar-label-group strong {
+        color: var(--primary-color);
+        font-weight: 700;
+      }
+      .bar-bg {
+        width: 100%;
+        height: 6px;
+        background: var(--gray-100);
+        border-radius: 99px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        background: var(--primary-color);
+        border-radius: 99px;
+      }
+      .bar-fill.gray {
+        background: var(--gray-500);
+      }
+      
+      .info-disease-card {
+        background: #0b4bcc;
+        color: white;
+        border: none;
+      }
+      .info-disease-card h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        margin-bottom: 24px;
+        color: white;
+      }
+      .info-section {
+        background: rgba(255,255,255,0.1);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .info-section h4 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        margin-bottom: 8px;
+        color: rgba(255,255,255,0.8);
+        font-weight: 500;
+      }
+      .info-section p {
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 0;
+        color: white;
+      }
+      .info-section ul {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+        font-size: 13px;
+      }
+      .info-section ul li {
+        margin-bottom: 6px;
+        padding-left: 16px;
+        position: relative;
+        line-height: 1.4;
+      }
+      .info-section ul li::before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        color: rgba(255,255,255,0.6);
+      }
+      .info-disease-card .btn-white {
+        background: white;
+        color: #0b4bcc;
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        cursor: pointer;
+        display: block;
+        text-align: center;
+        text-decoration: none;
+        margin-top: 16px;
+      }
+      
+      .input-symptoms-card {
+        background: white;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        padding: 1.5rem;
+      }
+      .input-symptoms-card h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        margin-bottom: 16px;
+        color: var(--text-primary);
+      }
+      .tags-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+      .tag-pill {
+        background: #e0e7ff;
+        color: #3730a3;
+        padding: 6px 12px;
+        border-radius: 99px;
+        font-size: 12px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .symptom-note {
+        font-size: 12px;
+        color: var(--gray-500);
+        line-height: 1.5;
+        padding-top: 16px;
+        border-top: 1px solid var(--gray-100);
+      }
     </style>
 </head>
 <body>
-
-<nav class="navbar">
-    <div class="navbar-brand"><i class="ti ti-stethoscope"></i> DermDetect</div>
-    <div class="navbar-links">
-        <a href="/user/dashboard.php" class="nav-link">Dashboard</a>
-        <a href="/user/diagnose.php" class="nav-link">Diagnosis</a>
-        <a href="/user/history.php" class="nav-link active">Riwayat</a>
-        <a href="/user/profile.php" class="nav-link">Profil</a>
-    </div>
-    <div class="nav-avatar"><?= strtoupper(substr($user['nama'], 0, 2)) ?></div>
-    <a href="/logout.php" class="btn btn-secondary btn-sm" style="margin-left:8px;">
-        <i class="ti ti-logout"></i> Keluar
-    </a>
-</nav>
-
-<div class="container">
-    <div class="flex items-center gap-2 mb-4">
-        <a href="/user/history.php" class="btn btn-secondary btn-sm">
-            <i class="ti ti-arrow-left"></i> Kembali
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img src="https://api.iconify.design/carbon:network-4.svg?color=%230b4bcc" alt="Logo" class="sidebar-logo">
+        <div>
+          <h2 class="sidebar-title">DermDetect</h2>
+          <span class="sidebar-subtitle">Clinical Portal</span>
+        </div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <a href="/user/dashboard.php" class="nav-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          Dashboard
         </a>
-        <h2 class="page-title" style="margin:0;">Hasil Diagnosis Lengkap</h2>
-        <span class="text-sm text-muted ml-auto">
-            <?= date('d M Y, H:i', strtotime($d['created_at'])) ?>
-        </span>
-    </div>
+        <a href="/user/diagnose.php" class="nav-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+          Diagnosis
+        </a>
+        <a href="/user/history.php" class="nav-item active">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          History
+        </a>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <a href="/logout.php" class="nav-item logout-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          Sign Out
+        </a>
+      </div>
+    </aside>
 
-    <?php if ($triple): ?>
-
-    <!-- ════════ HASIL UTAMA (FUSION) ════════ -->
-    <div class="fusion-banner">
-        <div class="fusion-title">🔀 Hasil Diagnosis Utama (Gabungan Foto + Gejala)</div>
-        <div class="fusion-disease" style="color:<?= $info['color'] ?>;">
-            <?= $info['icon'] ?> <?= $info['label'] ?>
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-nav">
+          <a href="/user/dashboard.php" class="topbar-link">Dashboard</a>
+          <a href="/user/diagnose.php" class="topbar-link">Diagnosis</a>
+          <a href="/user/history.php" class="topbar-link active">History</a>
         </div>
-        <div class="fusion-conf">Keyakinan: <strong><?= $triple['fusion']['confidence'] ?>%</strong></div>
-    </div>
-
-    <!-- ════════ INDIKATOR KONSISTENSI ════════ -->
-    <?php
-    $kStatus = $triple['konsistensi']['status'] ?? 'mayoritas';
-    $kStyle  = $konsistensiColor[$kStatus] ?? $konsistensiColor['mayoritas'];
-    ?>
-    <div class="konsistensi-box" style="background:<?= $kStyle['bg'] ?>;border:1px solid <?= $kStyle['border'] ?>;color:<?= $kStyle['text'] ?>;">
-        <i class="ti <?= $kStyle['icon'] ?>" style="font-size:20px;flex-shrink:0;"></i>
-        <div>
-            <div style="font-weight:700;"><?= htmlspecialchars($triple['konsistensi']['label']) ?></div>
-            <div style="font-size:12px;font-weight:400;margin-top:2px;">
-                <?php if ($kStatus === 'konsisten'): ?>
-                Ketiga metode analisis menghasilkan kesimpulan yang sama. Tingkat kepercayaan tinggi.
-                <?php elseif ($kStatus === 'mayoritas'): ?>
-                Dua dari tiga metode sepakat. Disarankan tetap konsultasi dengan dokter.
-                <?php else: ?>
-                Ketiga metode menghasilkan kesimpulan berbeda. Wajib konsultasi dokter untuk kepastian.
-                <?php endif; ?>
-            </div>
+        <div class="user-profile">
+          <div class="avatar" style="display:flex; align-items:center; justify-content:center; background:var(--primary-color); color:white; font-size:12px; font-weight:bold;">
+            <?= strtoupper(substr($user['nama'], 0, 2)) ?>
+          </div>
         </div>
-    </div>
-
-    <div class="grid-2">
-        <!-- ════════ KIRI: Triple Result ════════ -->
-        <div>
-
-            <!-- Tabel Perbandingan -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="ti ti-table" style="color:#2563EB;font-size:18px;"></i>
-                    <h3>Perbandingan Hasil Analisis</h3>
-                </div>
-                <div class="card-body" style="padding:12px 16px;">
-                    <!-- Header -->
-                    <div class="comparison-row comparison-header">
-                        <div>Metode</div>
-                        <div style="text-align:center;">Campak</div>
-                        <div style="text-align:center;">Rubella</div>
-                        <div style="text-align:center;">Cacar Air</div>
-                    </div>
-                    <?php
-                    $methods = [
-                        ['key' => 'cnn',    'label' => '📸 Visual (CNN)'],
-                        ['key' => 'mlp',    'label' => '🩺 Gejala (MLP)'],
-                        ['key' => 'fusion', 'label' => '🔀 Gabungan'],
-                    ];
-                    foreach ($methods as $m):
-                        $r    = $triple[$m['key']];
-                        $pred = $r['probabilitas'];
-                    ?>
-                    <div class="comparison-row">
-                        <div style="font-weight:500;"><?= $m['label'] ?></div>
-                        <?php foreach (['campak' => '#2563EB', 'rubella' => '#F59E0B', 'cacar' => '#10B981'] as $cls => $col):
-                            $pct    = $pred[$cls];
-                            $isBest = ($r['prediksi'] === $cls);
-                        ?>
-                        <div style="text-align:center;">
-                            <span style="font-weight:<?= $isBest ? '700' : '400' ?>;color:<?= $isBest ? $col : '#6B7280' ?>;">
-                                <?= $pct ?>%
-                                <?php if ($isBest): ?>
-                                <i class="ti ti-arrow-badge-up" style="font-size:11px;"></i>
-                                <?php endif; ?>
-                            </span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
+      </header>
+      
+      <!-- Page Content -->
+      <div class="page-content">
+        
+        <div class="result-hero">
+          <div class="result-image-box" style="background-image: url('/user/image.php?f=<?= htmlspecialchars($d['foto_path']) ?>');">
+            <div class="badge-original">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+              Original Scan
             </div>
-
-            <!-- Card CNN Only -->
-            <div class="triple-card">
-                <div class="triple-header">
-                    <i class="ti ti-camera" style="color:#7C3AED;font-size:18px;"></i>
-                    <div>
-                        <div style="font-weight:600;font-size:13px;">Analisis Visual (CNN Only)</div>
-                        <div class="text-sm text-muted">Berdasarkan foto saja, tanpa gejala</div>
-                    </div>
-                    <span class="method-badge" style="background:#F5F3FF;color:#7C3AED;">📸 Foto</span>
-                </div>
-                <div class="triple-body">
-                    <?php
-                    $cnn     = $triple['cnn'];
-                    $cnnInfo = $infoMap[$cnn['prediksi']] ?? $infoMap['campak'];
-                    ?>
-                    <div class="result-pill" style="background:<?= $cnnInfo['color'] ?>22;color:<?= $cnnInfo['color'] ?>;">
-                        <?= $cnnInfo['icon'] ?> <?= $cnnInfo['label'] ?>
-                        <span style="font-size:13px;font-weight:500;"><?= $cnn['confidence'] ?>%</span>
-                    </div>
-                    <?php foreach (['campak' => '#2563EB', 'rubella' => '#F59E0B', 'cacar' => '#10B981'] as $cls => $col): ?>
-                    <div class="mini-prob">
-                        <div class="mini-label"><?= $cls === 'cacar' ? 'Cacar Air' : ucfirst($cls) ?></div>
-                        <div class="mini-track">
-                            <div class="mini-fill" style="width:<?= $cnn['probabilitas'][$cls] ?>%;background:<?= $col ?>;"></div>
-                        </div>
-                        <div class="mini-pct"><?= $cnn['probabilitas'][$cls] ?>%</div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
+          </div>
+          
+          <div class="result-summary">
+            <div class="top-meta">
+              <span class="badge">HASIL ANALISIS MEDIS</span>
+              <span><?= date('d M Y • H:i A', strtotime($d['created_at'])) ?></span>
             </div>
-
-            <!-- Card MLP Only -->
-            <div class="triple-card">
-                <div class="triple-header">
-                    <i class="ti ti-clipboard-list" style="color:#059669;font-size:18px;"></i>
-                    <div>
-                        <div style="font-weight:600;font-size:13px;">Analisis Gejala (MLP Only)</div>
-                        <div class="text-sm text-muted">Berdasarkan gejala saja, tanpa foto</div>
-                    </div>
-                    <span class="method-badge" style="background:#ECFDF5;color:#059669;">🩺 Gejala</span>
-                </div>
-                <div class="triple-body">
-                    <?php
-                    $mlp     = $triple['mlp'];
-                    $mlpInfo = $infoMap[$mlp['prediksi']] ?? $infoMap['campak'];
-                    ?>
-                    <div class="result-pill" style="background:<?= $mlpInfo['color'] ?>22;color:<?= $mlpInfo['color'] ?>;">
-                        <?= $mlpInfo['icon'] ?> <?= $mlpInfo['label'] ?>
-                        <span style="font-size:13px;font-weight:500;"><?= $mlp['confidence'] ?>%</span>
-                    </div>
-                    <?php foreach (['campak' => '#2563EB', 'rubella' => '#F59E0B', 'cacar' => '#10B981'] as $cls => $col): ?>
-                    <div class="mini-prob">
-                        <div class="mini-label"><?= $cls === 'cacar' ? 'Cacar Air' : ucfirst($cls) ?></div>
-                        <div class="mini-track">
-                            <div class="mini-fill" style="width:<?= $mlp['probabilitas'][$cls] ?>%;background:<?= $col ?>;"></div>
-                        </div>
-                        <div class="mini-pct"><?= $mlp['probabilitas'][$cls] ?>%</div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
+            
+            <h1><?= $info['label'] ?></h1>
+            
+            <div class="confidence">
+              <strong><?= $triple ? $triple['fusion']['confidence'] : $d['confidence'] ?></strong>% <span>Confidence Level</span>
             </div>
+            
+            <?php
+            $kStatus = $triple['konsistensi']['status'] ?? 'mayoritas';
+            $kLabel = $triple['konsistensi']['label'] ?? 'Mayoritas Sepakat';
+            $isHigh = ($kStatus === 'konsisten');
+            ?>
+            <div class="consistency-alert <?= $isHigh ? 'high' : '' ?>">
+              <div class="icon-circle" style="<?= !$isHigh ? 'background:#F59E0B;' : '' ?>">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+              <div>
+                <h4><?= $kLabel ?> <?= $isHigh ? '— Kepercayaan Tinggi' : '— Kepercayaan Menengah' ?></h4>
+                <p>
+                  <?php if ($isHigh): ?>
+                  Kedua model AI memberikan hasil klasifikasi yang identik dengan skor probabilitas tinggi.
+                  <?php else: ?>
+                  Terdapat perbedaan kecil antara model visual dan gejala. Tetap ikuti saran dokter.
+                  <?php endif; ?>
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- ════════ KANAN: Info Penyakit & Gejala ════════ -->
-        <div>
+        <div class="result-grid">
+          <!-- Left Column -->
+          <div>
+            <?php if ($triple): ?>
+            <div class="table-card">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-color)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                Perbandingan Hasil Analisis
+              </h3>
+              <table class="comparison-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50%;">Model Arsitektur</th>
+                    <th>Prediksi Utama</th>
+                    <th style="text-align:right;">Skor Akurasi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px; font-weight:500;">
+                        <span style="background:#f1f5f9; padding:4px; border-radius:4px; display:inline-flex;">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        </span>
+                        Convolutional Neural Network (CNN)
+                      </div>
+                    </td>
+                    <td><?= $infoMap[$triple['cnn']['prediksi']]['label'] ?? 'N/A' ?></td>
+                    <td style="text-align:right; font-weight:700; color:var(--primary-color);"><?= $triple['cnn']['confidence'] ?>%</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px; font-weight:500;">
+                        <span style="background:#f1f5f9; padding:4px; border-radius:4px; display:inline-flex;">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#64748b;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </span>
+                        Multilayer Perceptron (MLP)
+                      </div>
+                    </td>
+                    <td><?= $infoMap[$triple['mlp']['prediksi']]['label'] ?? 'N/A' ?></td>
+                    <td style="text-align:right; font-weight:700; color:var(--primary-color);"><?= $triple['mlp']['confidence'] ?>%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <?php endif; ?>
+
+            <div class="analysis-cards-row">
+              <!-- Visual Analysis Bars -->
+              <div class="analysis-mini-card">
+                <h3>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-color)"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                  Analisis Visual
+                </h3>
+                
+                <?php
+                $cnnProbs = $triple ? $triple['cnn']['probabilitas'] : $d['probabilitas'];
+                foreach (['campak' => 'Campak', 'rubella' => 'Rubella', 'cacar' => 'Cacar Air'] as $key => $label):
+                    $pct = $cnnProbs[$key] ?? 0;
+                    $isTop = $pct >= max($cnnProbs);
+                ?>
+                <div class="bar-row">
+                  <div class="bar-label-group">
+                    <span><?= $label ?></span>
+                    <strong <?= !$isTop ? 'style="color:var(--gray-600);"' : '' ?>><?= $pct ?>%</strong>
+                  </div>
+                  <div class="bar-bg">
+                    <div class="bar-fill <?= !$isTop ? 'gray' : '' ?>" style="width:<?= $pct ?>%;"></div>
+                  </div>
+                </div>
+                <?php endforeach; ?>
+              </div>
+
+              <!-- Symptoms Analysis Bars -->
+              <div class="analysis-mini-card">
+                <h3>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-color)"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+                  Analisis Gejala
+                </h3>
+                
+                <?php
+                $mlpProbs = $triple ? $triple['mlp']['probabilitas'] : $d['probabilitas'];
+                foreach (['campak' => 'Campak', 'rubella' => 'Rubella', 'cacar' => 'Cacar Air'] as $key => $label):
+                    $pct = $mlpProbs[$key] ?? 0;
+                    $isTop = $pct >= max($mlpProbs);
+                ?>
+                <div class="bar-row">
+                  <div class="bar-label-group">
+                    <span><?= $label ?></span>
+                    <strong <?= !$isTop ? 'style="color:var(--gray-600);"' : '' ?>><?= $pct ?>%</strong>
+                  </div>
+                  <div class="bar-bg">
+                    <div class="bar-fill <?= !$isTop ? 'gray' : '' ?>" style="width:<?= $pct ?>%;"></div>
+                  </div>
+                </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column -->
+          <div>
             <!-- Info Penyakit -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="ti ti-info-circle" style="color:#2563EB;font-size:18px;"></i>
-                    <h3>Informasi Penyakit</h3>
-                    <span class="badge <?= $info['badge'] ?> ml-auto"><?= $info['label'] ?></span>
-                </div>
-                <div class="card-body">
-                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">Gejala Umum</div>
-                    <?php foreach ($info['gejala'] as $g): ?>
-                    <div class="flex gap-2" style="padding:3px 0;">
-                        <i class="ti ti-circle-dot" style="color:<?= $info['color'] ?>;flex-shrink:0;margin-top:2px;"></i>
-                        <span class="text-sm"><?= $g ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                    <hr class="divider">
-                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">Penanganan</div>
-                    <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:13px;color:#065F46;">
-                        <i class="ti ti-heart-handshake"></i> <?= $info['penanganan'] ?>
-                    </div>
-                </div>
+            <div class="info-disease-card">
+              <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                Informasi Penyakit
+              </h3>
+              
+              <div class="info-section">
+                <h4>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                  Tentang
+                </h4>
+                <p>Infeksi virus menular yang menyebabkan ruam gatal seperti lepuh pada kulit dan gejala seperti flu.</p>
+              </div>
+              
+              <div class="info-section">
+                <h4>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  Gejala Umum
+                </h4>
+                <ul>
+                  <?php foreach ($info['gejala'] as $g): ?>
+                  <li><?= $g ?></li>
+                  <?php endforeach; ?>
+                </ul>
+              </div>
+              
+              <button class="btn-white" onclick="alert('<?= htmlspecialchars($info['penanganan']) ?>')">Panduan Perawatan</button>
             </div>
-
+            
             <!-- Gejala yang Diinput -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="ti ti-clipboard-check" style="color:#10B981;font-size:18px;"></i>
-                    <h3>Gejala yang Diinput</h3>
+            <div class="input-symptoms-card">
+              <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary-color)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Gejala yang Diinput
+              </h3>
+              
+              <div class="tags-wrap">
+                <?php
+                $g = $d['gejala'];
+                $symptomsList = [];
+                if ($g['durasi_demam'] > 0 || ($g['demam_tinggi'] ?? 0)) $symptomsList[] = "Demam";
+                if ($g['vesikel'] ?? 0) $symptomsList[] = "Muncul Bintik/Lenting";
+                if ($g['batuk'] ?? 0) $symptomsList[] = "Batuk";
+                if ($g['pilek'] ?? 0) $symptomsList[] = "Pilek";
+                if ($g['sakit_tenggorokan'] ?? 0) $symptomsList[] = "Sakit Tenggorokan";
+                if ($g['mata_merah'] ?? 0) $symptomsList[] = "Mata Merah";
+                if ($g['nyeri_sendi'] ?? 0) $symptomsList[] = "Nyeri Sendi";
+                if ($g['lemas'] ?? 0) $symptomsList[] = "Lemas/Sakit Kepala";
+                if ($g['koplik_spot'] ?? 0) $symptomsList[] = "Bercak Putih di Mulut";
+                if ($g['kelenjar_bengkak'] ?? 0) $symptomsList[] = "Kelenjar Bengkak";
+                if ($g['hilang_nafsu_makan'] ?? 0) $symptomsList[] = "Nafsu Makan Turun";
+                
+                // fallback if empty
+                if(empty($symptomsList)) $symptomsList[] = "Tidak ada gejala spesifik diinput";
+                
+                foreach ($symptomsList as $s):
+                ?>
+                <div class="tag-pill">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  <?= $s ?>
                 </div>
-                <div class="card-body">
-                    <?php
-                    $g     = $d['gejala'];
-                    $items = [
-                        'Durasi demam'               => $g['durasi_demam'] . ' hari',
-                        'Demam tinggi (>38.5°C)'     => ($g['demam_tinggi'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Batuk kering'               => ($g['batuk'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Pilek / hidung tersumbat'   => ($g['pilek'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Sakit tenggorokan'          => ($g['sakit_tenggorokan'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Mata merah'                 => ($g['mata_merah'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Bercak koplik di mulut'     => ($g['koplik_spot'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Kelenjar bengkak'           => ($g['kelenjar_bengkak'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Ruam wajah ke badan'        => ($g['pola_ruam'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Nyeri sendi'                => ($g['nyeri_sendi'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Vesikel (gelembung cairan)' => ($g['vesikel'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Hilang nafsu makan'         => ($g['hilang_nafsu_makan'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Badan lemas & cepat lelah'  => ($g['lemas'] ?? 0) ? 'Ya' : 'Tidak',
-                    ];
-                    foreach ($items as $label => $val):
-                    ?>
-                    <div class="flex items-center" style="padding:6px 0;border-bottom:1px solid #F3F4F6;">
-                        <span class="text-muted text-sm" style="width:190px;"><?= $label ?></span>
-                        <span style="font-weight:500;color:<?= ($val === 'Ya') ? '#10B981' : '#6B7280' ?>;">
-                            <?= $val ?>
-                        </span>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
+                <?php endforeach; ?>
+              </div>
+              
+              <div class="symptom-note">
+                "Gejala mulai dirasakan sekitar <?= $g['durasi_demam'] ?? 0 ?> hari yang lalu berdasarkan input."
+              </div>
             </div>
-
-            <!-- Disclaimer & Aksi -->
-            <div class="card">
-                <div class="card-body">
-                    <div class="disclaimer mb-3">
-                        <i class="ti ti-alert-triangle"></i>
-                        Hasil ini hanya referensi awal berbasis AI. Selalu konsultasikan dengan dokter atau tenaga medis profesional untuk diagnosis dan penanganan yang tepat.
-                    </div>
-                    <a href="/user/diagnose.php" class="btn btn-primary btn-block mb-2">
-                        <i class="ti ti-plus"></i> Diagnosis Baru
-                    </a>
-                    <a href="/user/history.php" class="btn btn-secondary btn-block">
-                        <i class="ti ti-history"></i> Lihat Semua Riwayat
-                    </a>
-                </div>
-            </div>
+            
+          </div>
         </div>
-    </div>
-
-    <?php else: ?>
-    <!-- ════════ FALLBACK: data dari riwayat lama (tanpa triple) ════════ -->
-    <div class="grid-2">
-        <div>
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="ti ti-report-medical" style="color:#2563EB;font-size:18px;"></i>
-                    <h3>Hasil Prediksi</h3>
-                </div>
-                <div class="card-body">
-                    <div class="result-box <?= $info['class'] ?>">
-                        <div class="result-disease"><?= $info['icon'] ?> <?= $info['label'] ?></div>
-                        <div class="result-conf">Keyakinan: <strong><?= $d['confidence'] ?>%</strong></div>
-                    </div>
-                    <div style="font-weight:600;font-size:13px;margin-bottom:10px;">Probabilitas per Kelas</div>
-                    <?php foreach (['campak' => ['Campak', '#2563EB'], 'rubella' => ['Rubella', '#F59E0B'], 'cacar' => ['Cacar Air', '#10B981']] as $cls => [$lbl, $col]): ?>
-                    <div class="progress-row">
-                        <div class="progress-label"><?= $lbl ?></div>
-                        <div class="progress-track">
-                            <div class="progress-fill" style="width:<?= $prob[$cls] ?>%;background:<?= $col ?>;"></div>
-                        </div>
-                        <div class="progress-pct"><?= $prob[$cls] ?>%</div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-
-            <!-- Gejala yang Diinput -->
-            <div class="card">
-                <div class="card-header">
-                    <i class="ti ti-clipboard-list" style="color:#10B981;font-size:18px;"></i>
-                    <h3>Gejala yang Diinput</h3>
-                </div>
-                <div class="card-body">
-                    <?php
-                    $g     = $d['gejala'];
-                    $items = [
-                        'Durasi demam'               => $g['durasi_demam'] . ' hari',
-                        'Demam tinggi (>38.5°C)'     => ($g['demam_tinggi'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Batuk kering'               => ($g['batuk'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Pilek / hidung tersumbat'   => ($g['pilek'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Sakit tenggorokan'          => ($g['sakit_tenggorokan'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Mata merah'                 => ($g['mata_merah'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Bercak koplik di mulut'     => ($g['koplik_spot'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Kelenjar bengkak'           => ($g['kelenjar_bengkak'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Ruam wajah ke badan'        => ($g['pola_ruam'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Nyeri sendi'                => ($g['nyeri_sendi'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Vesikel (gelembung cairan)' => ($g['vesikel'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Hilang nafsu makan'         => ($g['hilang_nafsu_makan'] ?? 0) ? 'Ya' : 'Tidak',
-                        'Badan lemas & cepat lelah'  => ($g['lemas'] ?? 0) ? 'Ya' : 'Tidak',
-                    ];
-                    foreach ($items as $label => $val):
-                    ?>
-                    <div class="flex items-center" style="padding:7px 0;border-bottom:1px solid #F3F4F6;">
-                        <span class="text-muted text-sm" style="width:190px;"><?= $label ?></span>
-                        <span style="font-weight:500;color:<?= ($val === 'Ya') ? '#10B981' : '#6B7280' ?>;">
-                            <?= $val ?>
-                        </span>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </div>
-
-        <div>
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="ti ti-info-circle" style="color:#2563EB;font-size:18px;"></i>
-                    <h3>Informasi Penyakit</h3>
-                    <span class="badge <?= $info['badge'] ?> ml-auto"><?= $info['label'] ?></span>
-                </div>
-                <div class="card-body">
-                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">Gejala Umum</div>
-                    <?php foreach ($info['gejala'] as $g): ?>
-                    <div class="flex gap-2" style="padding:4px 0;">
-                        <i class="ti ti-circle-dot" style="color:<?= $info['color'] ?>;flex-shrink:0;margin-top:2px;"></i>
-                        <span class="text-sm"><?= $g ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                    <hr class="divider">
-                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">Penanganan</div>
-                    <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:13px;color:#065F46;">
-                        <i class="ti ti-heart-handshake"></i> <?= $info['penanganan'] ?>
-                    </div>
-                    <div class="disclaimer mt-3">
-                        <i class="ti ti-alert-triangle"></i>
-                        Hasil ini hanya referensi awal. Konsultasikan ke dokter.
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-body">
-                    <a href="/user/diagnose.php" class="btn btn-primary btn-block mb-2">
-                        <i class="ti ti-plus"></i> Diagnosis Baru
-                    </a>
-                    <a href="/user/history.php" class="btn btn-secondary btn-block">
-                        <i class="ti ti-history"></i> Lihat Semua Riwayat
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-</div>
-
+        
+      </div>
+    </main>
+  </div>
 </body>
 </html>

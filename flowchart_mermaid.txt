@@ -1,0 +1,305 @@
+Mermaid Flowchart Code — DermDetect
+Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
+
+Salin masing-masing blok kode mulai dari tulisan "flowchart TD" atau "flowchart LR" ke: https://mermaid.live
+
+================================================================================
+Diagram 1 — Alur Training Model (src/train.py)
+================================================================================
+
+flowchart TD
+    START([🚀 Mulai: python src/train.py]) --> STEP1
+
+    subgraph LANGKAH1["📂 LANGKAH 1–2: Load & Pairing Data"]
+        STEP1["Load Dataset\n• Citra dari data/images/campak|rubella|cacar/train|test\n• Gejala dari data/symptoms CSV\n  └─ preprocessing.py: load_data()"]
+        STEP1 --> STEP2["Pairing Citra ↔ Gejala\nPer kelas secara random sampling\n└─ preprocessing.py: pair_images_with_symptoms()"]
+    end
+
+    subgraph LANGKAH3["✂️ LANGKAH 3: Split Data"]
+        STEP2 --> STEP3["Split Internal Train → Train + Val\n• 90% Train Aktif\n• 10% Validasi Internal\n└─ train_test_split(stratify=True, seed=42)"]
+    end
+
+    subgraph LANGKAH4["🔄 LANGKAH 4: tf.data Pipeline"]
+        STEP3 --> DS_TRAIN["Dataset Train\n• shuffle=True\n• augment=True\n  ├─ random_flip_left_right\n  ├─ random_flip_up_down\n  ├─ random_brightness ±15%\n  ├─ random_contrast ±15%\n  └─ random_saturation ±15%"]
+        STEP3 --> DS_VAL["Dataset Validasi\n• shuffle=False\n• augment=False"]
+        STEP3 --> DS_TEST["Dataset Test\n• shuffle=False\n• augment=False"]
+        DS_TRAIN --> CW["Hitung Class Weight\nBalanced Otomatis per Kelas"]
+    end
+
+    subgraph LANGKAH5["🧱 LANGKAH 5: Build FusionNet"]
+        CW --> BUILD["build_fusion_model()\n└─ model_fusion.py"]
+        BUILD --> CNN_BRANCH["Cabang CNN (Citra)\nInput: 224×224×3\n→ MobileNetV2 Pre-trained\n→ GlobalAveragePooling2D\n→ Dense(256, ReLU)\n→ Dropout\n→ Dense(128, ReLU)"]
+        BUILD --> MLP_BRANCH["Cabang MLP (Gejala)\nInput: 13 Fitur Klinis\n→ Dense(64, ReLU)\n→ BatchNormalization\n→ Dropout\n→ Dense(32, ReLU)"]
+        CNN_BRANCH --> CONCAT["Concatenate (128+32 = 160 dim)\n→ Dense(128, ReLU)\n→ Dropout\n→ Dense(64, ReLU)\n→ Dense(3, Softmax)\n└─ Output: [Campak, Rubella, Cacar]"]
+        MLP_BRANCH --> CONCAT
+        CONCAT --> COMPILE["compile_model()\nOptimizer: Adam (LR=1e-4)\nLoss: SparseCategoricalCrossentropy\nMetrics: accuracy"]
+    end
+
+    subgraph PHASE1["🔒 LANGKAH 6: Phase 1 — Training Head (Backbone Frozen)"]
+        COMPILE --> P1_INFO["Phase 1 Config:\n• Max Epoch: 30\n• Batch Size: 16\n• LR: 1e-4\n• MobileNetV2 layer.trainable = False"]
+        P1_INFO --> P1_CB["Callbacks:\n• ModelCheckpoint → best_model.keras\n  (monitor: val_accuracy)\n• EarlyStopping\n  (patience: 8 epoch)\n• ReduceLROnPlateau\n  (factor: 0.5, patience: 4)"]
+        P1_CB --> P1_TRAIN["model.fit(ds_train, validation_data=ds_val)\nclass_weight=class_weight_dict"]
+        P1_TRAIN --> P1_CHECK{{"val_accuracy\ntidak naik ≥ 8 epoch?"}}
+        P1_CHECK -->|"Ya — Early Stop"| P1_DONE
+        P1_CHECK -->|"Tidak — Lanjut"| P1_DONE
+        P1_DONE["Phase 1 Selesai\nSimpan: history_phase1_frozen.png"]
+    end
+
+    subgraph PHASE2["🔓 LANGKAH 7: Phase 2 — Fine-Tuning Backbone"]
+        P1_DONE --> P2_UNF["unfreeze_for_finetuning()\nBuka 30 Layer Terakhir MobileNetV2"]
+        P2_UNF --> P2_INFO["Phase 2 Config:\n• Max Epoch: 20\n• LR: 1e-5 (10× lebih kecil)\n• 30 layer backbone trainable = True"]
+        P2_INFO --> P2_TRAIN["model.fit(ds_train, validation_data=ds_val)\nclass_weight=class_weight_dict"]
+        P2_TRAIN --> P2_CHECK{{"val_accuracy\ntidak naik ≥ 8 epoch?"}}
+        P2_CHECK -->|"Ya — Early Stop"| P2_DONE
+        P2_CHECK -->|"Tidak — Lanjut"| P2_DONE
+        P2_DONE["Phase 2 Selesai\nSimpan: history_phase2_finetune.png"]
+    end
+
+    subgraph EVALUASI["📊 Evaluasi & Simpan Output"]
+        P2_DONE --> EVAL_LOAD["Load best_model.keras\n(checkpoint val_accuracy terbaik)"]
+        EVAL_LOAD --> EVAL_PRED["Prediksi pada ds_test\ny_pred = argmax(model.predict())"]
+        EVAL_PRED --> EVAL_RPT["Simpan evaluation_report.txt\n• Test Loss & Accuracy\n• Classification Report\n  (precision, recall, f1-score)\n  per kelas"]
+        EVAL_PRED --> EVAL_CM["Simpan confusion_matrix.png\nHeatmap seaborn"]
+        EVAL_RPT --> SAVE
+        EVAL_CM --> SAVE
+        SAVE["Simpan Output Akhir:\n• best_model.keras ✅\n• final_model.keras ✅\n• scaler.pkl ✅"]
+    end
+
+    SAVE --> END([✅ Training Selesai!\nModel siap digunakan])
+
+    style LANGKAH1 fill:#0f2027,stroke:#4ECDC4,color:#e2e8f0
+    style LANGKAH3 fill:#0f2027,stroke:#4ECDC4,color:#e2e8f0
+    style LANGKAH4 fill:#0f2027,stroke:#FFD700,color:#e2e8f0
+    style LANGKAH5 fill:#0f2027,stroke:#4ECDC4,color:#e2e8f0
+    style PHASE1   fill:#200f0f,stroke:#FF4B4B,color:#e2e8f0
+    style PHASE2   fill:#0f200f,stroke:#4ECDC4,color:#e2e8f0
+    style EVALUASI fill:#201f0f,stroke:#FF8C00,color:#e2e8f0
+
+
+================================================================================
+Diagram 2 — Alur Sistem Web (Flask Backend + PHP Frontend)
+================================================================================
+
+flowchart TD
+    USER([👤 Pengguna]) -->|"Buka Browser"| WEB
+
+    subgraph WEB["🌐 PHP Frontend — localhost:8080"]
+        W1["Halaman Login\n/auth/login.php"] --> W2{{"Sudah punya\nJWT Token?"}}
+        W2 -->|"Belum"| W3["Input Email + Password\n→ POST ke Flask /api/auth/login"]
+        W2 -->|"Sudah"| W4
+        W3 -->|"Token diterima"| W4
+        W4["Dashboard Pengguna"] --> W5{{"Pilih Menu"}}
+        W5 -->|"Diagnosa Baru"| WD["📸 Halaman Diagnosa\n/diagnose/index.php\nUpload Foto + Isi Gejala"]
+        W5 -->|"Riwayat"| WH["📋 Riwayat Diagnosa\n/history/index.php"]
+        W5 -->|"Panel Admin"| WA["🛡️ Panel Admin\n/admin/index.php"]
+    end
+
+    subgraph FLASK["⚙️ Flask REST API — localhost:5000"]
+        subgraph AUTH["/api/auth — auth_bp"]
+            A1["POST /api/auth/login\nVerifikasi email+password (bcrypt)\nGenerate JWT Token"]
+            A2["POST /api/auth/register\nBuat akun baru"]
+            A3["POST /api/auth/logout\nBlacklist token"]
+        end
+        subgraph DIAGNOSE["/api/diagnose — diagnose_bp"]
+            D1["POST /api/diagnose\n@jwt_required\nTerima: foto + gejala JSON\nJalankan prediksi model\nSimpan ke DB"]
+            D2["GET /api/diagnose/history\n@jwt_required\nAmbil riwayat diagnosa user"]
+        end
+        subgraph USER_API["/api/user — user_bp"]
+            U1["GET /api/user/profile\nData profil pengguna"]
+            U2["PUT /api/user/profile\nUpdate profil"]
+        end
+        subgraph ADMIN_API["/api/admin — admin_bp"]
+            AD1["GET /api/admin/users\nDaftar semua user"]
+            AD2["GET /api/admin/stats\nStatistik sistem"]
+            AD3["DELETE /api/admin/users/:id\nHapus user"]
+        end
+        HEALTH["GET /api/health\nCek status API"]
+    end
+
+    subgraph DB["🗄️ MySQL Database — dermdetect"]
+        DB1[("Tabel: users\nid, email, password_hash\nrole, created_at")]
+        DB2[("Tabel: diagnosa\nid, user_id, foto_path\ngejala_json, hasil_fusion\nhasil_cnn, hasil_mlp\nconfidence, created_at")]
+    end
+
+    subgraph MODEL_LOAD["🧠 Model TensorFlow"]
+        ML1["best_model.keras\n(Load saat startup)"]
+        ML2["scaler.pkl\n(Normalisasi durasi demam)"]
+    end
+
+    WD -->|"multipart/form-data\n+ Authorization: Bearer JWT"| D1
+    WH -->|"GET + JWT"| D2
+    WA -->|"GET/DELETE + JWT (Admin)"| ADMIN_API
+    W3 -->|"POST credentials"| A1
+
+    A1 <-->|"Query/Write"| DB1
+    D1 <-->|"Write hasil"| DB2
+    D2 <-->|"Read riwayat"| DB2
+    ADMIN_API <-->|"Read/Delete"| DB1
+
+    D1 --> ML1
+    D1 --> ML2
+
+    D1 -->|"JSON Response\n{hasil_fusion, hasil_cnn, hasil_mlp\nconfidence, kelas}"| WD
+    D2 -->|"JSON Array riwayat"| WH
+
+    style WEB       fill:#0f2027,stroke:#4ECDC4,color:#e2e8f0
+    style FLASK     fill:#200f20,stroke:#FF8C00,color:#e2e8f0
+    style DB        fill:#0f200f,stroke:#FFD700,color:#e2e8f0
+    style MODEL_LOAD fill:#200f0f,stroke:#FF4B4B,color:#e2e8f0
+    style AUTH      fill:#1a1a2a,stroke:#4ECDC4,color:#e2e8f0
+    style DIAGNOSE  fill:#1a1a2a,stroke:#FF8C00,color:#e2e8f0
+    style USER_API  fill:#1a1a2a,stroke:#4ECDC4,color:#e2e8f0
+    style ADMIN_API fill:#1a1a2a,stroke:#FF4B4B,color:#e2e8f0
+
+
+================================================================================
+Diagram 3 — Alur Prediksi / Diagnosis
+================================================================================
+
+flowchart TD
+    START([👤 User Membuka\nHalaman Diagnosa]) --> INP1
+
+    subgraph INPUT["📝 Form Input — PHP Frontend"]
+        INP1["Upload Foto Ruam Kulit\n(.jpg / .jpeg / .png)"]
+        INP1 --> INP2["Isi 13 Gejala Klinis:"]
+        INP2 --> GJ1["1. Durasi Demam\n   (Slider: 0–14 Hari)"]
+        INP2 --> GJ2["2.  Demam Tinggi ≥38.5°C\n3.  Batuk Kering\n4.  Pilek\n5.  Sakit Tenggorokan\n6.  Konjungtivitis (Mata Merah)\n7.  Koplik Spot (Bercak di Mulut)"]
+        INP2 --> GJ3["8.  Kelenjar Bengkak\n9.  Ruam Awal di Wajah/Leher\n10. Nyeri Sendi\n11. Vesikel (Lenting Cairan)\n12. Hilang Nafsu Makan\n13. Lemas"]
+        GJ1 --> BTN["🖱️ Klik: Diagnosis Sekarang"]
+        GJ2 --> BTN
+        GJ3 --> BTN
+    end
+
+    BTN -->|"POST multipart/form-data\n+ Authorization: Bearer JWT"| AUTH_CHECK
+
+    subgraph FLASK_PROC["⚙️ Flask — POST /api/diagnose"]
+        AUTH_CHECK{{"JWT Token\nValid?"}}
+        AUTH_CHECK -->|"❌ 401 Unauthorized"| ERR["Return Error\n401 Unauthorized"]
+        AUTH_CHECK -->|"✅ Valid"| RECV
+
+        subgraph PREPROC["🔧 Preprocessing"]
+            RECV["Terima: file gambar + data gejala"]
+            RECV --> IMG_PROC["Preprocessing Citra:\n1. PIL.Image.open(file)\n2. .convert('RGB')\n3. .resize((224, 224))\n4. np.array / 255.0  → float32 [0,1]\n5. np.expand_dims  → shape (1,224,224,3)"]
+            RECV --> SYM_PROC["Preprocessing Gejala:\n1. Ambil durasi_demam\n2. scaler.transform([[durasi]])\n   → normalisasi StandardScaler\n3. Susun array shape (1, 13) float32\n   [durasi_norm, 0/1, 0/1, ..., 0/1]"]
+        end
+
+        subgraph INFER["🧠 Model Inference (Triple Result)"]
+            IMG_PROC --> FUSION_PRED["Prediksi FUSION (Utama)\nmodel.predict({\n  'input_citra': img_batch,\n  'input_gejala': symptom_vector\n})"]
+            SYM_PROC --> FUSION_PRED
+
+            IMG_PROC --> CNN_PRED["Prediksi CNN Only\nHanya branch citra\n(gejala = zeros)"]
+            SYM_PROC --> MLP_PRED["Prediksi MLP Only\nHanya branch gejala\n(citra = zeros)"]
+
+            FUSION_PRED --> FRES["Fusion Result:\nargmax(preds) → kelas\nmax(preds)*100 → confidence %"]
+            CNN_PRED    --> CRES["CNN Result:\nkelas + confidence %"]
+            MLP_PRED    --> MRES["MLP Result:\nkelas + confidence %"]
+        end
+
+        FRES --> SAVE_DB
+        CRES --> SAVE_DB
+        MRES --> SAVE_DB
+        SAVE_DB["Simpan ke MySQL\nTabel diagnosa:\n• user_id, foto_path\n• gejala_json\n• hasil_fusion, conf_fusion\n• hasil_cnn, conf_cnn\n• hasil_mlp, conf_mlp\n• created_at"]
+        SAVE_DB --> RESP["Return JSON Response\n200 OK"]
+    end
+
+    RESP -->|"JSON"| RENDER
+
+    subgraph RESULT["📊 Tampilan Hasil — PHP Frontend"]
+        RENDER["Render Kartu Hasil Diagnosis"]
+        RENDER --> MAIN_CARD["Hasil Utama (FUSION):\n🔴 Campak | 🟠 Rubella | 🟡 Cacar Air\nConfidence: XX.XX%"]
+        RENDER --> TRIPLE["Triple Result Panel:\n┌────────────────────────┐\n│ Fusion: Campak  97.3%  │ ← Utama\n│ CNN:    Campak  94.1%  │\n│ MLP:    Campak  89.7%  │\n└────────────────────────┘"]
+        RENDER --> PROGRESS["Progress Bar\n3 Kelas Confidence Score"]
+        RENDER --> DETAIL["Detail Penyakit:\n• Deskripsi singkat\n• Gejala umum\n• Saran penanganan"]
+        RENDER --> DISC["⚠️ Disclaimer:\nHasil bersifat referensi akademis,\nbukan diagnosis medis resmi"]
+    end
+
+    subgraph CLASSES["🏥 3 Kelas Output"]
+        FRES --> C1["🔴 CAMPAK\nCampak = Measles\nRuam makulopapular merah\nmenyebar wajah → tubuh\nDemam tinggi, batuk, koplik spot"]
+        FRES --> C2["🟠 RUBELLA\nCampak Jerman\nRuam merah muda, cepat (2–3 hari)\nKelenjar bengkak, demam ringan\nBerbahaya untuk ibu hamil"]
+        FRES --> C3["🟡 CACAR AIR\nVaricella-Zoster\nVesikel (lenting berisi cairan)\nGatal intens, muncul bertahap\n→ pecah → keropeng"]
+    end
+
+    style INPUT     fill:#0f2027,stroke:#4ECDC4,color:#e2e8f0
+    style FLASK_PROC fill:#200f20,stroke:#FF8C00,color:#e2e8f0
+    style PREPROC   fill:#1a1a2a,stroke:#4ECDC4,color:#e2e8f0
+    style INFER     fill:#1a2a1a,stroke:#FFD700,color:#e2e8f0
+    style RESULT    fill:#200f0f,stroke:#FF4B4B,color:#e2e8f0
+    style CLASSES   fill:#0f2020,stroke:#4ECDC4,color:#e2e8f0
+
+
+================================================================================
+Diagram 4 — Arsitektur Sistem Keseluruhan (Overview)
+================================================================================
+
+flowchart LR
+    subgraph RAW["📁 Data Mentah"]
+        R1["data/images/\n├── campak/\n│   ├── train/  → asli + aug_\n│   └── test/   → asli\n├── rubella/\n│   ├── train/\n│   └── test/\n└── cacar/\n    ├── train/\n    └── test/"]
+        R2["data/symptoms/\nCSV gejala klinis\n13 fitur per sampel\n(durasi, demam, batuk, ...)"]
+    end
+
+    subgraph PIPELINE["🔁 Training Pipeline (src/)"]
+        P1["split_dataset.py\nBagi data 80/20"]
+        P2["augmentasi.py\nAugmentasi offline\n+15 gambar per asli"]
+        P3["preprocessing.py\nLoad & normalize\nPairing citra ↔ gejala"]
+        P4["model_fusion.py\nBuild FusionNet\n(MobileNetV2 + MLP)"]
+        P5["train.py\n2-Phase Training\nEvaluasi & Simpan"]
+        P1 --> P3
+        P2 --> P3
+        P3 --> P5
+        P4 --> P5
+    end
+
+    subgraph ARTIFACTS["💾 Artefak Model (model/)"]
+        A1["best_model.keras\n(val_accuracy terbaik)"]
+        A2["final_model.keras\n(akhir phase 2)"]
+        A3["scaler.pkl\n(StandardScaler)"]
+        A4["confusion_matrix.png"]
+        A5["evaluation_report.txt\n(precision/recall/f1)"]
+        A6["history_phase1_frozen.png\nhistory_phase2_finetune.png"]
+    end
+
+    subgraph BACKEND["⚙️ Flask API (flask-backend/)"]
+        B1["app.py\ncreate_app()"]
+        B2["config.py\n.env settings"]
+        B3["models.py\nSQLAlchemy ORM"]
+        B4["routes/auth.py\nJWT Auth"]
+        B5["routes/diagnose.py\nPrediksi Model"]
+        B6["routes/user.py\nProfil User"]
+        B7["routes/admin.py\nAdmin Panel"]
+        B1 --- B4
+        B1 --- B5
+        B1 --- B6
+        B1 --- B7
+    end
+
+    subgraph DB["🗄️ MySQL"]
+        DB1[("dermdetect DB\n• users\n• diagnosa\n• model_metadata")]
+    end
+
+    subgraph FRONTEND["🌐 PHP Frontend (frontend - php/)"]
+        F1["Login / Register"]
+        F2["Diagnosa\n(Upload + Gejala)"]
+        F3["Riwayat"]
+        F4["Admin Panel"]
+        F5["Halaman Tentang"]
+    end
+
+    subgraph STREAMLIT["📊 Streamlit App (Opsional)"]
+        S1["app.py / src/streamlit_app.py\nDashboard Dataset\nVisualisasi Training\nPrediksi Standalone"]
+    end
+
+    RAW --> PIPELINE
+    PIPELINE --> ARTIFACTS
+    ARTIFACTS --> BACKEND
+    ARTIFACTS --> STREAMLIT
+    RAW -.->|"Data gambar\nuntuk analisis"| STREAMLIT
+    BACKEND <-->|"SQLAlchemy ORM"| DB
+    BACKEND <-->|"REST API\nHTTP + JWT\n(cURL server-side)"| FRONTEND
+
+    style RAW       fill:#0f2027,stroke:#4ECDC4,color:#e2e8f0
+    style PIPELINE  fill:#200f20,stroke:#FF8C00,color:#e2e8f0
+    style ARTIFACTS fill:#0f200f,stroke:#FFD700,color:#e2e8f0
+    style BACKEND   fill:#200f0f,stroke:#FF4B4B,color:#e2e8f0
+    style DB        fill:#0f2020,stroke:#4ECDC4,color:#e2e8f0
+    style FRONTEND  fill:#1a1a2a,stroke:#4ECDC4,color:#e2e8f0
+    style STREAMLIT fill:#20200f,stroke:#FF8C00,color:#e2e8f0

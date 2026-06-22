@@ -1,0 +1,75 @@
+Mermaid Activity Diagram Code — DermDetect
+Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
+
+Salin blok kode di bawah ini mulai dari tulisan "stateDiagram-v2" ke: https://mermaid.live
+
+================================================================================
+Activity Diagram — Proses Diagnosis Penyakit Ruam Kulit
+================================================================================
+
+stateDiagram-v2
+    classDef user fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
+    classDef frontend fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    classDef backend fill:#fef08a,stroke:#ca8a04,stroke-width:2px
+    classDef database fill:#fce7f3,stroke:#db2777,stroke-width:2px
+
+    [*] --> BukaHalamanDiagnosa
+    
+    state "Pengguna (User)" as User {
+        BukaHalamanDiagnosa ::: user
+        UnggahFoto ::: user
+        IsiGejalaKlinis ::: user
+        KlikDiagnosis ::: user
+        BacaHasilDiagnosis ::: user
+    }
+
+    state "Frontend (PHP)" as Frontend {
+        TampilFormDiagnosa ::: frontend
+        ValidasiInputFrontend ::: frontend
+        KirimRequestAPI ::: frontend
+        RenderHasilUI ::: frontend
+        TampilPesanError ::: frontend
+    }
+
+    state "Backend (Flask API & Model)" as Backend {
+        VerifikasiTokenJWT ::: backend
+        PreprocessingCitraGejala ::: backend
+        InferenceModelFusion ::: backend
+        FormatJSONResponse ::: backend
+        KirimKeDatabase ::: backend
+    }
+
+    state "Database (MySQL)" as DB {
+        SimpanRiwayatDiagnosa ::: database
+    }
+
+    %% Alur Aktivitas
+    BukaHalamanDiagnosa --> TampilFormDiagnosa
+    TampilFormDiagnosa --> UnggahFoto
+    UnggahFoto --> IsiGejalaKlinis
+    IsiGejalaKlinis --> KlikDiagnosis
+    KlikDiagnosis --> ValidasiInputFrontend
+
+    state ValidasiForm <<choice>>
+    ValidasiInputFrontend --> ValidasiForm
+    ValidasiForm --> TampilPesanError: Input Tidak Lengkap
+    TampilPesanError --> TampilFormDiagnosa
+    ValidasiForm --> KirimRequestAPI: Input Lengkap
+
+    KirimRequestAPI --> VerifikasiTokenJWT
+    
+    state ValidasiJWT <<choice>>
+    VerifikasiTokenJWT --> ValidasiJWT
+    ValidasiJWT --> TampilPesanError: Token Expired / Invalid
+    ValidasiJWT --> PreprocessingCitraGejala: Token Valid
+
+    PreprocessingCitraGejala --> InferenceModelFusion : Citra 224x224 & Array 13 Dimensi
+    InferenceModelFusion --> FormatJSONResponse : Prediksi Triple Result (Fusion, CNN, MLP)
+    
+    FormatJSONResponse --> KirimKeDatabase
+    KirimKeDatabase --> SimpanRiwayatDiagnosa
+    SimpanRiwayatDiagnosa --> FormatJSONResponse : Sukses Menyimpan
+    
+    FormatJSONResponse --> RenderHasilUI : Response 200 OK (Data Hasil)
+    RenderHasilUI --> BacaHasilDiagnosis
+    BacaHasilDiagnosis --> [*]

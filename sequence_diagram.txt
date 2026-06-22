@@ -1,0 +1,63 @@
+Mermaid Sequence Diagram Code — DermDetect
+Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
+
+Salin blok kode di bawah ini mulai dari tulisan "sequenceDiagram" ke: https://mermaid.live
+
+================================================================================
+Sequence Diagram — Proses Diagnosa Penyakit Ruam Kulit
+================================================================================
+
+sequenceDiagram
+    autonumber
+    actor User as 👤 Pengguna
+    participant FE as 🌐 Frontend (PHP)
+    participant API as ⚙️ Flask Backend
+    participant AI as 🧠 Model Fusion AI
+    participant DB as 🗄️ Database MySQL
+
+    User->>FE: Mengisi form diagnosa (Upload foto & 13 gejala)
+    User->>FE: Menekan tombol "Diagnosis Sekarang"
+    
+    activate FE
+    FE->>FE: Memvalidasi kelengkapan data (Client-side)
+    
+    %% Request ke Backend
+    FE->>API: HTTP POST /api/diagnose\n(Payload: FormData + Header Authorization: Bearer JWT)
+    activate API
+    
+    %% Verifikasi Keamanan
+    API->>API: Verifikasi Token JWT
+    
+    alt Token Tidak Valid / Expired
+        API-->>FE: Return 401 Unauthorized (JSON)
+        FE-->>User: Tampilkan peringatan sesi habis & Redirect ke Login
+    else Token Valid
+        %% Pemrosesan
+        API->>API: Preprocessing Citra (Resize 224x224, Normalize /255)
+        API->>API: Preprocessing Gejala (StandardScaler untuk durasi demam)
+        
+        %% Model Inference
+        API->>AI: model.predict({input_citra, input_gejala})
+        activate AI
+        Note over AI: Melakukan perhitungan dengan<br/>MobileNetV2 (CNN) dan MLP
+        AI-->>API: Return Array Prediksi (Probabilitas kelas)
+        deactivate AI
+        
+        API->>API: Hitung argmax untuk mendapatkan kelas prediksi utama
+        API->>API: Ekstrak Triple Result (CNN, MLP, Fusion) beserta Confidence (%)
+        
+        %% Penyimpanan ke Database
+        API->>DB: INSERT INTO diagnoses (user_id, foto_path, gejala_json, hasil, triple_data)
+        activate DB
+        DB-->>API: Konfirmasi penyimpanan berhasil
+        deactivate DB
+        
+        %% Kirim balasan ke Frontend
+        API-->>FE: Return HTTP 200 OK\n(JSON: hasil prediksi, angka probabilitas, dll)
+    end
+    deactivate API
+    
+    %% Render UI Output
+    FE->>FE: Merender layout Kartu Hasil, Progress Bar, & Info Medis
+    FE-->>User: Menampilkan Tampilan Hasil Diagnosa (UI) ke layar pengguna
+    deactivate FE

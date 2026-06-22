@@ -1,0 +1,80 @@
+Mermaid Class Diagram Code — DermDetect
+Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
+
+Salin blok kode di bawah ini mulai dari tulisan "classDiagram" ke: https://mermaid.live
+
+================================================================================
+Class Diagram — Entity Relationship (Models)
+================================================================================
+
+classDiagram
+    direction TB
+
+    class User {
+        +Integer id [PK]
+        +String(100) nama
+        +String(150) email
+        +String(255) password
+        +Enum role ("user", "admin")
+        +String(255) foto_profil
+        +DateTime created_at
+        +DateTime updated_at
+        +__init__(**kwargs)
+        +to_dict() Dictionary
+    }
+
+    class ModelVersion {
+        +Integer id [PK]
+        +String(20) versi
+        +String(255) nama_file
+        +Float akurasi
+        +Float f1_score
+        +Text keterangan
+        +Boolean is_active
+        +Integer uploaded_by [FK]
+        +DateTime created_at
+        +__init__(**kwargs)
+        +to_dict() Dictionary
+    }
+
+    class Diagnosis {
+        +Integer id [PK]
+        +Integer user_id [FK]
+        +Integer model_id [FK]
+        +String(255) foto_path
+        <<Gejala Klinis>>
+        +Integer durasi_demam
+        +Boolean demam_tinggi
+        +Boolean batuk
+        +Boolean pilek
+        +Boolean sakit_tenggorokan
+        +Boolean mata_merah
+        +Boolean koplik_spot
+        +Boolean kelenjar_bengkak
+        +Boolean pola_ruam
+        +Boolean nyeri_sendi
+        +Boolean vesikel
+        +Boolean hilang_nafsu_makan
+        +Boolean lemas
+        <<Hasil Prediksi>>
+        +Enum hasil ("campak", "rubella", "cacar")
+        +Float confidence
+        +Float prob_campak
+        +Float prob_rubella
+        +Float prob_cacar
+        +Enum status ("selesai", "review", "dihapus")
+        +Text triple_data
+        +DateTime created_at
+        +__init__(**kwargs)
+        +to_dict() Dictionary
+    }
+
+    %% Relasi antar entitas
+    User "1" -- "*" Diagnosis : "melakukan >"
+    User "1" -- "*" ModelVersion : "mengunggah >"
+    ModelVersion "1" -- "*" Diagnosis : "digunakan oleh >"
+
+    %% Styling
+    style User fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px
+    style ModelVersion fill:#fef08a,stroke:#ca8a04,stroke-width:1.5px
+    style Diagnosis fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px
