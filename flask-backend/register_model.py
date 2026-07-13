@@ -23,8 +23,8 @@ def register_model():
             new_model = ModelVersion(
                 versi='2.0',
                 nama_file='final_model.keras',
-                akurasi=100.0,
-                f1_score=100.0,
+                akurasi=0.95,
+                f1_score=0.95,
                 keterangan='Model FusionNet Ekstrim dengan augmentasi masif dan fitur klinis yang diperbarui.',
                 is_active=True
             )
@@ -32,8 +32,8 @@ def register_model():
         else:
             new_model.is_active = True
             new_model.versi = '2.1'
-            new_model.akurasi = 100.0
-            new_model.keterangan = 'Pembaruan FusionNet (Akurasi Uji: 100%)'
+            new_model.akurasi = 0.95
+            new_model.keterangan = 'Pembaruan FusionNet (Akurasi Uji: 95%)'
 
         db.session.commit()
         print("Model final_model.keras berhasil didaftarkan dan diaktifkan di database!")
