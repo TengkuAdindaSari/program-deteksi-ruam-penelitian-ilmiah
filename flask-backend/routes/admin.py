@@ -293,11 +293,28 @@ def upload_model():
 
     # Simpan ke database
     data    = request.form
+
+    # Normalisasi akurasi & f1_score ke desimal (0-1)
+    akurasi  = float(data.get('akurasi', 0)) if data.get('akurasi') else None
+    f1_score = float(data.get('f1_score', 0)) if data.get('f1_score') else None
+
+    if akurasi is not None:
+        if akurasi > 100:
+            return jsonify({'success': False, 'message': 'Akurasi tidak boleh lebih dari 100'}), 400
+        if akurasi > 1:
+            akurasi = akurasi / 100.0  # Konversi persen ke desimal
+
+    if f1_score is not None:
+        if f1_score > 100:
+            return jsonify({'success': False, 'message': 'F1-Score tidak boleh lebih dari 100'}), 400
+        if f1_score > 1:
+            f1_score = f1_score / 100.0  # Konversi persen ke desimal
+
     version = ModelVersion(
         versi       = data.get('versi', 'v_baru'),
         nama_file   = filename,
-        akurasi     = float(data.get('akurasi', 0)) if data.get('akurasi') else None,
-        f1_score    = float(data.get('f1_score', 0)) if data.get('f1_score') else None,
+        akurasi     = akurasi,
+        f1_score    = f1_score,
         keterangan  = data.get('keterangan'),
         is_active   = False,
         uploaded_by = identity,

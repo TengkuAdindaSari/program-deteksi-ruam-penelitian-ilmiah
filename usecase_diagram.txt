@@ -1,11 +1,3 @@
-Mermaid Use Case Diagram Code — DermDetect
-Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
-
-Salin blok kode di bawah ini mulai dari tulisan "flowchart LR" ke: https://mermaid.live
-
-================================================================================
-Use Case Diagram — DermDetect
-================================================================================
 
 flowchart LR
     %% Aktor

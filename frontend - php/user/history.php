@@ -95,22 +95,8 @@ $badgeMap = ['campak'=>'badge-blue','rubella'=>'badge-amber','cacar'=>'badge-gre
         
         <!-- Data Table -->
         <div class="data-card">
-          <div class="table-header">
-            <div class="search-box">
-              <span class="search-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              </span>
-              <input type="text" placeholder="Cari hasil atau tanggal...">
-            </div>
-            <div class="table-actions">
-              <button class="icon-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-              </button>
-              <button class="icon-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              </button>
-            </div>
-          </div>
+
+
           
           <?php if (empty($diagnoses)): ?>
           <div style="text-align: center; padding: 4rem;">

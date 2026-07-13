@@ -117,12 +117,22 @@ $flash = getFlash();
           </div>
           
           <div class="stat-card">
-            <div class="stat-icon icon-gray">
+            <div class="stat-icon icon-gray" style="background-color: #fef3c7; color: #b45309;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
             </div>
             <div class="stat-info">
-              <h3>Rubella & Cacar Air</h3>
-              <p style="font-size: 1rem;"><?= ($stat['rubella'] ?? 0) . ' / ' . ($stat['cacar'] ?? 0) ?></p>
+              <h3>Rubella</h3>
+              <p><?= $stat['rubella'] ?? 0 ?></p>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon icon-gray" style="background-color: #dcfce7; color: #15803d;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+            <div class="stat-info">
+              <h3>Cacar Air</h3>
+              <p><?= $stat['cacar'] ?? 0 ?></p>
             </div>
           </div>
         </div>

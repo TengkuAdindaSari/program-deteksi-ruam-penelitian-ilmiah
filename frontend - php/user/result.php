@@ -457,7 +457,7 @@ $konsistensiColor = [
           
           <div class="result-summary">
             <div class="top-meta">
-              <span class="badge">HASIL ANALISIS MEDIS</span>
+              <span class="badge">HASIL ANALISIS</span>
               <span><?= date('d M Y • H:i A', strtotime($d['created_at'])) ?></span>
             </div>
             
@@ -633,10 +633,9 @@ $konsistensiColor = [
                 <?php
                 $g = $d['gejala'];
                 $symptomsList = [];
-                if ($g['durasi_demam'] > 0 || ($g['demam_tinggi'] ?? 0)) $symptomsList[] = "Demam";
+                if ($g['demam_tinggi'] ?? 0) $symptomsList[] = "Demam";
                 if ($g['vesikel'] ?? 0) $symptomsList[] = "Muncul Bintik/Lenting";
-                if ($g['batuk'] ?? 0) $symptomsList[] = "Batuk";
-                if ($g['pilek'] ?? 0) $symptomsList[] = "Pilek";
+                if ($g['batuk'] ?? 0) $symptomsList[] = "Batuk Kering";
                 if ($g['sakit_tenggorokan'] ?? 0) $symptomsList[] = "Sakit Tenggorokan";
                 if ($g['mata_merah'] ?? 0) $symptomsList[] = "Mata Merah";
                 if ($g['nyeri_sendi'] ?? 0) $symptomsList[] = "Nyeri Sendi";
@@ -655,10 +654,6 @@ $konsistensiColor = [
                   <?= $s ?>
                 </div>
                 <?php endforeach; ?>
-              </div>
-              
-              <div class="symptom-note">
-                "Gejala mulai dirasakan sekitar <?= $g['durasi_demam'] ?? 0 ?> hari yang lalu berdasarkan input."
               </div>
             </div>
             

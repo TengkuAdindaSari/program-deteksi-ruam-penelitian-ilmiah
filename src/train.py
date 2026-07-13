@@ -15,7 +15,6 @@ Alur Training 2-Phase:
 Output yang dihasilkan (di folder model/):
   - best_model.keras          <- Model dengan val_accuracy terbaik
   - final_model.keras         <- Model dari akhir training Phase 2
-  - scaler.pkl                <- StandardScaler untuk normalisasi durasi_demam
   - history_phase1_frozen.png <- Kurva akurasi/loss Phase 1
   - history_phase2_finetune.png <- Kurva akurasi/loss Phase 2
   - confusion_matrix.png      <- Confusion matrix test set
@@ -85,9 +84,10 @@ def augment_image(image):
     """
     image = tf.image.random_flip_left_right(image)
     image = tf.image.random_flip_up_down(image)
-    image = tf.image.random_brightness(image, max_delta=0.15)
-    image = tf.image.random_contrast(image, lower=0.85, upper=1.15)
-    image = tf.image.random_saturation(image, lower=0.85, upper=1.15)
+    image = tf.image.random_brightness(image, max_delta=0.30)
+    image = tf.image.random_contrast(image, lower=0.60, upper=1.40)
+    image = tf.image.random_saturation(image, lower=0.60, upper=1.40)
+    image = tf.image.random_hue(image, max_delta=0.1)
     image = tf.clip_by_value(image, 0.0, 1.0)
     return image
 
@@ -159,7 +159,7 @@ def plot_history(history, phase_name: str = 'phase'):
 # HELPER: EVALUASI LENGKAP
 # =============================================================================
 def evaluate_and_report(model, ds_test, X_img_test, X_sym_test, y_test):
-    """Evaluasi model pada test set dan simpan laporan + confusion matrix."""
+    """Evaluasi model pada test set dan simpan laporan + confusion matrix + metrics image."""
     print("\n" + "=" * 60)
     print("  EVALUASI AKHIR (TEST SET)")
     print("=" * 60)
@@ -178,6 +178,7 @@ def evaluate_and_report(model, ds_test, X_img_test, X_sym_test, y_test):
 
     # Classification Report
     report = classification_report(y_test, y_pred, target_names=CLASSES, digits=4)
+    report_dict = classification_report(y_test, y_pred, target_names=CLASSES, digits=4, output_dict=True)
     print("\n  Classification Report:")
     print(report)
 
@@ -209,7 +210,93 @@ def evaluate_and_report(model, ds_test, X_img_test, X_sym_test, y_test):
     plt.close()
     print(f"  Confusion matrix : {cm_path}")
 
+    # ── METRICS REPORT IMAGE ──
+    _generate_metrics_image(report_dict, test_acc, test_loss)
+
     return test_acc
+
+
+def _generate_metrics_image(report_dict, test_acc, test_loss):
+    """Generate gambar tabel metrik evaluasi: Accuracy, Precision, Recall, F1-Score."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.axis('off')
+    fig.patch.set_facecolor('#FFFFFF')
+
+    # Judul
+    fig.suptitle('Laporan Evaluasi Model FusionNet',
+                 fontsize=16, fontweight='bold', y=0.96, color='#1a1a2e')
+    ax.text(0.5, 0.95, f'Overall Accuracy: {test_acc*100:.2f}%  |  Test Loss: {test_loss:.4f}',
+            transform=ax.transAxes, ha='center', fontsize=12, color='#4a4a4a',
+            style='italic')
+
+    # Data tabel
+    col_labels = ['Kelas', 'Precision', 'Recall', 'F1-Score', 'Support']
+    table_data = []
+    for cls in CLASSES:
+        d = report_dict[cls]
+        table_data.append([
+            cls.capitalize(),
+            f"{d['precision']:.4f}",
+            f"{d['recall']:.4f}",
+            f"{d['f1-score']:.4f}",
+            f"{int(d['support'])}",
+        ])
+
+    # Tambah separator dan summary rows
+    table_data.append(['', '', '', '', ''])  # blank row
+    for key, label in [('macro avg', 'Macro Avg'), ('weighted avg', 'Weighted Avg')]:
+        d = report_dict[key]
+        table_data.append([
+            label,
+            f"{d['precision']:.4f}",
+            f"{d['recall']:.4f}",
+            f"{d['f1-score']:.4f}",
+            f"{int(d['support'])}",
+        ])
+
+    table = ax.table(
+        cellText=table_data,
+        colLabels=col_labels,
+        loc='center',
+        cellLoc='center',
+    )
+
+    # Styling tabel
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    table.scale(1.0, 1.8)
+
+    # Style header
+    for j in range(len(col_labels)):
+        cell = table[0, j]
+        cell.set_facecolor('#0b4bcc')
+        cell.set_text_props(color='white', fontweight='bold', fontsize=12)
+        cell.set_edgecolor('#ffffff')
+
+    # Style data rows
+    for i in range(1, len(table_data) + 1):
+        for j in range(len(col_labels)):
+            cell = table[i, j]
+            cell.set_edgecolor('#e0e0e0')
+            if i <= len(CLASSES):
+                # Per-class rows
+                cell.set_facecolor('#f0f4ff' if i % 2 == 1 else '#ffffff')
+            elif table_data[i-1][0] == '':
+                # Blank separator row
+                cell.set_facecolor('#ffffff')
+                cell.set_edgecolor('#ffffff')
+                cell.set_height(0.02)
+            else:
+                # Summary rows
+                cell.set_facecolor('#e8f0fe')
+                cell.set_text_props(fontweight='bold')
+
+    plt.tight_layout()
+    metrics_path = os.path.join(MODEL_DIR, 'metrics_report.png')
+    plt.savefig(metrics_path, dpi=150, bbox_inches='tight',
+                facecolor=fig.get_facecolor())
+    plt.close()
+    print(f"  Metrics report   : {metrics_path}")
 
 
 # =============================================================================
@@ -228,7 +315,7 @@ def main():
     data    = load_data(os.path.join(ROOT_DIR, 'data'))
     img_full = data['images']    # {'X_train', 'y_train', 'X_test', 'y_test'}
     sym_full = data['symptoms']  # {'X_train', 'y_train', 'X_test', 'y_test'}
-    scaler   = data['scaler']
+    classes  = data['classes']
 
     print(f"\n  Citra  train : {img_full['X_train'].shape}")
     print(f"  Citra  test  : {img_full['X_test'].shape}")
@@ -250,27 +337,36 @@ def main():
     print(f"  Pasangan train: {len(y_tr_full):,} | test: {len(y_test):,}")
 
     # ------------------------------------------------------------------
-    # LANGKAH 3: Split internal train -> train + validasi
+    # LANGKAH 3: Split folder test (20%) -> 10% Validasi + 10% Test murni
     # ------------------------------------------------------------------
-    print(f"\n[3/7] Split internal train/validasi ({int((1-VAL_SPLIT)*100)}/{int(VAL_SPLIT*100)})...")
-    idx_tr, idx_val = train_test_split(
-        np.arange(len(y_tr_full)),
-        test_size=VAL_SPLIT,
-        stratify=y_tr_full,
+    print(f"\n[3/7] Split test set menjadi validasi & test final (50/50)...")
+    idx_val, idx_test = train_test_split(
+        np.arange(len(y_test)),
+        test_size=0.5,
+        stratify=y_test,
         random_state=SEED
     )
-    X_img_tr   = X_img_tr_full[idx_tr]
-    X_sym_tr   = X_sym_tr_full[idx_tr]
-    y_tr       = y_tr_full[idx_tr]
-    X_img_val  = X_img_tr_full[idx_val]
-    X_sym_val  = X_sym_tr_full[idx_val]
-    y_val      = y_tr_full[idx_val]
+    
+    # Train = 100% dari folder train
+    X_img_tr  = X_img_tr_full
+    X_sym_tr  = X_sym_tr_full
+    y_tr      = y_tr_full
+    
+    # Validation = 50% dari folder test
+    X_img_val = X_img_test[idx_val]
+    X_sym_val = X_sym_test[idx_val]
+    y_val     = y_test[idx_val]
+    
+    # Test = 50% sisa dari folder test
+    X_img_test_final = X_img_test[idx_test]
+    X_sym_test_final = X_sym_test[idx_test]
+    y_test_final     = y_test[idx_test]
 
-    print(f"\n  Ringkasan data:")
-    print(f"    Train aktif  : {len(y_tr):,} sampel")
-    print(f"    Validasi     : {len(y_val):,} sampel")
-    print(f"    Test         : {len(y_test):,} sampel")
-    print(f"    Total        : {len(y_tr) + len(y_val) + len(y_test):,} sampel")
+    print(f"\n  Ringkasan data (80% Train, 10% Val, 10% Test):")
+    print(f"    Train aktif  : {len(y_tr):,} sampel (Augmented)")
+    print(f"    Validasi     : {len(y_val):,} sampel (Murni)")
+    print(f"    Test         : {len(y_test_final):,} sampel (Murni)")
+    print(f"    Total        : {len(y_tr) + len(y_val) + len(y_test_final):,} sampel")
 
     # ------------------------------------------------------------------
     # LANGKAH 4: Buat tf.data.Dataset (augmentasi online untuk train)
@@ -278,17 +374,17 @@ def main():
     print("\n[4/7] Membuat tf.data pipeline (augmentasi online aktif untuk train)...")
     ds_train = make_dataset(X_img_tr,  X_sym_tr,  y_tr,  BATCH_SIZE, shuffle=True,  augment=True)
     ds_val   = make_dataset(X_img_val, X_sym_val, y_val, BATCH_SIZE, shuffle=False, augment=False)
-    ds_test  = make_dataset(X_img_test, X_sym_test, y_test, BATCH_SIZE, shuffle=False, augment=False)
+    ds_test  = make_dataset(X_img_test_final, X_sym_test_final, y_test_final, BATCH_SIZE, shuffle=False, augment=False)
 
     # Class weights untuk menangani imbalance
     class_weights_arr = compute_class_weight(
         class_weight='balanced',
-        classes=np.array([0, 1, 2]),
+        classes=np.unique(y_tr),
         y=y_tr
     )
     class_weight_dict = dict(enumerate(class_weights_arr))
     print(f"\n  Class weights (balance otomatis):")
-    for idx, cls in enumerate(CLASSES):
+    for idx, cls in enumerate(classes):
         print(f"    {cls:10s}: {class_weight_dict[idx]:.4f}")
 
     # ------------------------------------------------------------------
@@ -400,19 +496,15 @@ def main():
     # ------------------------------------------------------------------
     print("\nMemuat model terbaik dari checkpoint untuk evaluasi...")
     best_model = tf.keras.models.load_model(best_model_path)
-    final_test_acc = evaluate_and_report(best_model, ds_test, X_img_test, X_sym_test, y_test)
+    final_test_acc = evaluate_and_report(best_model, ds_test, X_img_test_final, X_sym_test_final, y_test_final)
 
     # ------------------------------------------------------------------
-    # SIMPAN MODEL FINAL + SCALER
+    # SIMPAN MODEL FINAL
     # ------------------------------------------------------------------
     final_path = os.path.join(MODEL_DIR, 'final_model.keras')
     best_model.save(final_path)
-    print(f"\n  Model final disimpan : {final_path}")
-
-    scaler_path = os.path.join(MODEL_DIR, 'scaler.pkl')
-    with open(scaler_path, 'wb') as f:
-        pickle.dump(scaler, f)
-    print(f"  Scaler disimpan      : {scaler_path}")
+    print("Model final berhasil disimpan di : " + final_path)
+    print("Model klasifikasi berhasil disimpan.")
 
     # ------------------------------------------------------------------
     # RINGKASAN AKHIR

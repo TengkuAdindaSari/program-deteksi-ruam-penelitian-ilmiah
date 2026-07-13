@@ -77,7 +77,7 @@ $flash = getFlash();
                 <a href="/admin/diagnoses.php"><i class="ti ti-history"></i> Histori Diagnosis</a>
                 <a href="/admin/users.php" class="active"><i class="ti ti-users"></i> Kelola User</a>
                 <a href="/admin/models.php"><i class="ti ti-cpu"></i> Kelola Model</a>
-                <a href="/admin/stats.php"><i class="ti ti-chart-bar"></i> Statistik</a>
+
             </div>
         </div>
 

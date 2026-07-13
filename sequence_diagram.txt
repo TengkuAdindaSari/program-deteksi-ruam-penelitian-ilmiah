@@ -1,11 +1,4 @@
-Mermaid Sequence Diagram Code — DermDetect
-Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
 
-Salin blok kode di bawah ini mulai dari tulisan "sequenceDiagram" ke: https://mermaid.live
-
-================================================================================
-Sequence Diagram — Proses Diagnosa Penyakit Ruam Kulit
-================================================================================
 
 sequenceDiagram
     autonumber

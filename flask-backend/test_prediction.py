@@ -77,11 +77,11 @@ def run_test():
             print(f"Response: {res_json}")
             
             if response.status_code == 200 and res_json.get('success'):
-                print("✅ Test passed! Prediction pipeline is working perfectly with 13 symptoms.")
+                print("[OK] Test passed! Prediction pipeline is working perfectly with 13 symptoms.")
             else:
-                print("❌ Test failed!")
+                print("[X] Test failed!")
         except Exception as e:
-            print(f"❌ Test failed with exception: {e}")
+            print(f"[X] Test failed with exception: {e}")
         finally:
             diagnose_route.preprocess_image = old_preprocess
 

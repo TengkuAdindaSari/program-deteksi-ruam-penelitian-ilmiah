@@ -75,19 +75,15 @@ class Diagnosis(db.Model):  # type: ignore[name-defined]
     model_id         = db.Column(db.Integer, db.ForeignKey('model_versions.id'), nullable=True)
     foto_path        = db.Column(db.String(255), nullable=False)
     # Gejala
-    durasi_demam     = db.Column(db.Integer, nullable=False)
     demam_tinggi     = db.Column(db.Boolean, default=False)
-    batuk            = db.Column(db.Boolean, default=False)
-    pilek            = db.Column(db.Boolean, default=False)
+    demam_ringan     = db.Column(db.Boolean, default=False)
     sakit_tenggorokan = db.Column(db.Boolean, default=False)
-    mata_merah       = db.Column(db.Boolean, default=False)
+    konjungtivitis   = db.Column(db.Boolean, default=False)
     koplik_spot      = db.Column(db.Boolean, default=False)
     kelenjar_bengkak = db.Column(db.Boolean, default=False)
-    pola_ruam        = db.Column(db.Boolean, default=False)
     nyeri_sendi      = db.Column(db.Boolean, default=False)
     vesikel          = db.Column(db.Boolean, default=False)
-    hilang_nafsu_makan = db.Column(db.Boolean, default=False)
-    lemas            = db.Column(db.Boolean, default=False)
+    lemas_malaise    = db.Column(db.Boolean, default=False)
     # Hasil
     hasil            = db.Column(db.Enum('campak', 'rubella', 'cacar'), nullable=False)
     confidence       = db.Column(db.Float, nullable=False)
@@ -116,19 +112,15 @@ class Diagnosis(db.Model):  # type: ignore[name-defined]
             'model_id'        : self.model_id,
             'foto_path'       : self.foto_path,
             'gejala': {
-                'durasi_demam'      : self.durasi_demam,
                 'demam_tinggi'      : self.demam_tinggi,
-                'batuk'             : self.batuk,
-                'pilek'             : self.pilek,
+                'demam_ringan'      : self.demam_ringan,
                 'sakit_tenggorokan' : self.sakit_tenggorokan,
-                'mata_merah'        : self.mata_merah,
+                'konjungtivitis'    : self.konjungtivitis,
                 'koplik_spot'       : self.koplik_spot,
                 'kelenjar_bengkak'  : self.kelenjar_bengkak,
-                'pola_ruam'         : self.pola_ruam,
                 'nyeri_sendi'       : self.nyeri_sendi,
                 'vesikel'           : self.vesikel,
-                'hilang_nafsu_makan': self.hilang_nafsu_makan,
-                'lemas'             : self.lemas,
+                'lemas_malaise'     : self.lemas_malaise,
             },
             'hasil'           : self.hasil,
             'confidence'      : round(self.confidence * 100, 2),

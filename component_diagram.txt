@@ -1,0 +1,50 @@
+Mermaid Component Diagram Code — DermDetect
+Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
+
+Salin blok kode di bawah ini mulai dari tulisan "flowchart TB" ke draw.io
+
+================================================================================
+Component Diagram — Arsitektur Sistem Perangkat Lunak
+================================================================================
+
+flowchart TB
+    %% Styling
+    classDef client fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
+    classDef frontend fill:#dcfce7,stroke:#16a34a,stroke-width:2px
+    classDef backend fill:#fef08a,stroke:#ca8a04,stroke-width:2px
+    classDef ai fill:#ffedd5,stroke:#ea580c,stroke-width:2px
+    classDef database fill:#fce7f3,stroke:#db2777,stroke-width:2px
+
+    %% Components
+    Client["📱 Client Interface\n(Web Browser / Mobile)"] ::: client
+
+    subgraph "Frontend Server (PHP)"
+        UI["🖥️ UI Components\n(Views & Forms)"] ::: frontend
+        ClientValid["✅ Client-side Logic\n(Validation & Request)"] ::: frontend
+    end
+
+    subgraph "Backend Server (Flask API)"
+        API["⚙️ REST API Endpoint\n(Routes & Controllers)"] ::: backend
+        Auth["🛡️ Security & JWT\n(Authentication)"] ::: backend
+        PreProc["🖼️ Data Preprocessing\n(Image & Symptoms)"] ::: backend
+        
+        subgraph "AI & ML Engine"
+            FusionModel["🧠 Fusion Model\n(CNN MobileNetV2 + MLP)"] ::: ai
+        end
+    end
+
+    subgraph "Database Server (MySQL)"
+        DB[("🗄️ Database\n(Users, Diagnoses, Models)")] ::: database
+    end
+
+    %% Connections
+    Client <-->|HTTPS / UI Interaction| UI
+    UI -->|Data Input| ClientValid
+    ClientValid -->|HTTPS POST (JSON/FormData)| API
+    
+    API <-->|Token Verify| Auth
+    API -->|Raw Image & Symptoms| PreProc
+    PreProc -->|Tensor / Array 13D| FusionModel
+    FusionModel -->|Prediction Results| API
+    
+    API <-->|SQL Queries (CRUD)| DB

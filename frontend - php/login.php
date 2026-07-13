@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               </svg>
             </span>
           </div>
-          <a href="#" class="link-right">Lupa password?</a>
+
         </div>
         
         <button type="submit" class="btn-primary">

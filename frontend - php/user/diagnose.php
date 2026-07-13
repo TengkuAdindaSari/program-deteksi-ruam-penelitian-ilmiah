@@ -13,22 +13,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Foto wajib diupload';
     } else {
         $data = [
-            'durasi_demam'       => (int)($_POST['durasi_demam'] ?? 4),
             'demam_tinggi'       => isset($_POST['demam_tinggi'])       ? 1 : 0,
-            'batuk'              => isset($_POST['batuk'])              ? 1 : 0,
-            'pilek'              => isset($_POST['pilek'])              ? 1 : 0,
+            'demam_ringan'       => isset($_POST['demam_ringan'])       ? 1 : 0,
             'sakit_tenggorokan'  => isset($_POST['sakit_tenggorokan'])  ? 1 : 0,
             'mata_merah'         => isset($_POST['mata_merah'])         ? 1 : 0,
             'koplik_spot'        => isset($_POST['koplik_spot'])        ? 1 : 0,
             'kelenjar_bengkak'   => isset($_POST['kelenjar_bengkak'])   ? 1 : 0,
-            'pola_ruam'          => isset($_POST['pola_ruam'])          ? 1 : 0,
             'nyeri_sendi'        => isset($_POST['nyeri_sendi'])        ? 1 : 0,
             'vesikel'            => isset($_POST['vesikel'])            ? 1 : 0,
-            'hilang_nafsu_makan' => isset($_POST['hilang_nafsu_makan']) ? 1 : 0,
             'lemas'              => isset($_POST['lemas'])              ? 1 : 0,
         ];
 
-        $res = Api::post('/diagnose/predict', $data, $token, ['foto' => $_FILES['foto']]);
+        if (array_sum($data) === 0) {
+            $error = 'Harap pilih minimal satu gejala klinis yang dirasakan. Data gejala tidak boleh kosong sama sekali.';
+        } else {
+            $res = Api::post('/diagnose/predict', $data, $token, ['foto' => $_FILES['foto']]);
 
         if ($res['success'] ?? false) {
             $id = $res['data']['id'];
@@ -40,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = $res['message'] ?? 'Prediksi gagal, coba lagi';
         }
     }
+}
 }
 ?>
 <!DOCTYPE html>
@@ -146,9 +146,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                   </div>
                   <p class="upload-text">Klik atau seret gambar ke sini</p>
-                  <p class="upload-hint">Mendukung format JPG, PNG, atau WEBP (Maks. 5MB)</p>
+                  <p class="upload-hint">Hanya mendukung format JPG dan PNG (Maks. 5MB)</p>
                   
-                  <input type="file" id="fotoInput" name="foto" accept="image/*" style="display:none;" onchange="previewFoto(this)" required>
+                  <input type="file" id="fotoInput" name="foto" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none;" onchange="previewFoto(this)" required>
                   <img id="previewImg" class="upload-preview" src="" alt="Preview" style="display:none; max-width: 100%; max-height: 200px; margin: 1rem auto; border-radius: var(--radius-md);">
                   <p id="namaFile" class="text-sm text-muted mt-1" style="font-size: 0.75rem; color: var(--text-secondary);"></p>
                   
@@ -163,21 +163,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   Gejala Klinis
                 </h3>
                 
-                <div class="slider-group">
-                  <div class="slider-header">
-                    <span>Durasi Demam (Hari)</span>
-                    <span class="slider-badge"><span id="durasiValBadge">3</span> Hari</span>
-                  </div>
-                  <div style="position: relative; margin-top: 1rem; margin-bottom: 0.5rem;">
-                    <input type="range" name="durasi_demam" min="0" max="14" value="3" id="demamRange" oninput="document.getElementById('durasiValBadge').textContent=this.value">
-                  </div>
-                  <div class="slider-labels">
-                    <span>0 HARI</span>
-                    <span>7 HARI</span>
-                    <span>14 HARI</span>
-                  </div>
-                </div>
-                
                 <div class="checkbox-grid">
                   <div class="checkbox-group">
                     <h4>GEJALA UMUM</h4>
@@ -190,21 +175,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                       Demam Tinggi (>38.5°C)
                     </label>
                     <label class="checkbox-label">
-                      <input type="checkbox" name="hilang_nafsu_makan" id="hilang_nafsu_makan">
-                      Nafsu Makan Menurun
+                      <input type="checkbox" name="demam_ringan" id="demam_ringan">
+                      Demam Ringan
                     </label>
                   </div>
                   
                   <div class="checkbox-group">
                     <h4>PERNAFASAN & KEPALA</h4>
-                    <label class="checkbox-label">
-                      <input type="checkbox" name="batuk" id="batuk">
-                      Batuk / Pilek
-                    </label>
-                    <label class="checkbox-label">
-                      <input type="checkbox" name="pilek" id="pilek">
-                      Hidung Tersumbat
-                    </label>
                     <label class="checkbox-label">
                       <input type="checkbox" name="sakit_tenggorokan" id="sakit_tenggorokan">
                       Sakit Tenggorokan
@@ -215,10 +192,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <h4>RUAM & GEJALA KHAS</h4>
                     <div class="checkbox-grid">
                       <div>
-                        <label class="checkbox-label">
-                          <input type="checkbox" name="pola_ruam" id="pola_ruam" checked>
-                          Ruam Menyebar (Wajah ke Badan)
-                        </label>
                         <label class="checkbox-label">
                           <input type="checkbox" name="mata_merah" id="mata_merah">
                           Mata Merah (Konjungtivitis)

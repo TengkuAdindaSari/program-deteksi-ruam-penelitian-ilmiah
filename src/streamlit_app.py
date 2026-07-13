@@ -327,24 +327,19 @@ def show_prediction_page():
         st.markdown("### 2. Checklist Gejala Klinis")
         st.caption("Pilih kondisi gejala yang dirasakan oleh pasien saat ini.")
 
-        durasi_demam = st.slider("Lama / Durasi Demam (Hari)", min_value=0, max_value=14, value=3)
-        
         col_g1, col_g2 = st.columns(2)
         with col_g1:
             demam_tinggi = st.checkbox("Mengalami Demam Tinggi (>38.5°C)")
-            batuk = st.checkbox("Batuk Kering")
-            pilek = st.checkbox("Pilek / Hidung Tersumbat")
+            demam_ringan = st.checkbox("Demam Ringan")
             sakit_tenggorokan = st.checkbox("Sakit Tenggorokan")
             konjungtivitis = st.checkbox("Mata Merah & Berair")
             koplik_spot = st.checkbox("Bercak Koplik (Bintik Putih di Mulut)")
         
         with col_g2:
             kelenjar_bengkak = st.checkbox("Pembengkakan Kelenjar (Leher/Telinga)")
-            ruam_wajah_ke_leher = st.checkbox("Ruam Awal Muncul di Wajah/Leher")
             nyeri_sendi = st.checkbox("Nyeri Sendi / Pegal-pegal")
             vesikel = st.checkbox("Lenting / Gelembung Berisi Cairan")
-            hilang_nafsu_makan = st.checkbox("Hilang Nafsu Makan")
-            lemas = st.checkbox("Badan Lemas & Cepat Lelah")
+            lemas_malaise = st.checkbox("Badan Lemas & Cepat Lelah")
 
         predict_btn = st.button("Diagnosis Sekarang", type="primary", use_container_width=True)
 
@@ -355,28 +350,23 @@ def show_prediction_page():
             with st.spinner("Model sedang memproses citra dan data gejala..."):
                 _, img_batch = preprocess_uploaded_image(uploaded_file)
                 
-                if scaler is not None:
-                    durasi_norm = float(scaler.transform([[durasi_demam]])[0][0])
-                else:
-                    durasi_norm = (durasi_demam - 4.0) / 1.2
-                
                 symptom_vector = np.array([[
-                    durasi_norm,
                     int(demam_tinggi),
-                    int(batuk),
-                    int(pilek),
-                    int(sakit_tenggorokan),
-                    int(konjungtivitis),
+                    int(demam_ringan),
                     int(koplik_spot),
                     int(kelenjar_bengkak),
-                    int(ruam_wajah_ke_leher),
-                    int(nyeri_sendi),
                     int(vesikel),
-                    int(hilang_nafsu_makan),
-                    int(lemas)
+                    int(konjungtivitis),
+                    int(nyeri_sendi),
+                    int(sakit_tenggorokan),
+                    int(lemas_malaise),
+                    1 # pola_ruam hardcoded
                 ]], dtype=np.float32)
 
-                preds = model.predict(
+                if np.sum(symptom_vector) == 0:
+                    st.error("⚠️ Harap centang minimal satu gejala klinis yang dirasakan. Data gejala tidak boleh kosong sama sekali.")
+                else:
+                    preds = model.predict(
                     {'input_citra': img_batch, 'input_gejala': symptom_vector},
                     verbose=0
                 )

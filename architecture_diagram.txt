@@ -1,0 +1,62 @@
+Mermaid Architecture Diagram Code — DermDetect (CNN + MLP Fusion)
+Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
+
+Salin blok kode di bawah ini mulai dari tulisan "flowchart LR" ke draw.io
+
+================================================================================
+Architecture Diagram — Model Multi-Modal (Late Fusion Network)
+================================================================================
+
+flowchart LR
+    classDef inputNode fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#000
+    classDef cnnNode fill:#fef08a,stroke:#ca8a04,stroke-width:2px,color:#000
+    classDef mlpNode fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#000
+    classDef fusionNode fill:#ffedd5,stroke:#ea580c,stroke-width:2px,color:#000
+    classDef outputNode fill:#fce7f3,stroke:#db2777,stroke-width:2px,color:#000
+
+    %% Inputs
+    ImgInput["🖼️ Input Citra Ruam<br/>(224 x 224 x 3)"] ::: inputNode
+    SympInput["📋 Input Gejala Klinis<br/>(13 Dimensi)"] ::: inputNode
+
+    %% CNN Branch
+    subgraph CNN ["Cabang CNN (Pemrosesan Citra)"]
+        direction LR
+        MobileNet["MobileNetV2<br/>(Pre-trained Backbone)"] ::: cnnNode
+        GAP["Global Average Pooling<br/>(GAP)"] ::: cnnNode
+        DenseC1["Dense Layer<br/>(256 neuron)"] ::: cnnNode
+        DenseC2["Dense Layer<br/>(128 neuron)"] ::: cnnNode
+        
+        MobileNet --> GAP --> DenseC1 --> DenseC2
+    end
+
+    %% MLP Branch
+    subgraph MLP ["Cabang MLP (Pemrosesan Gejala/Fitur)"]
+        direction LR
+        DenseM1["Dense Layer<br/>(64 neuron)"] ::: mlpNode
+        BN["Batch Normalization"] ::: mlpNode
+        DenseM2["Dense Layer<br/>(32 neuron)"] ::: mlpNode
+        
+        DenseM1 --> BN --> DenseM2
+    end
+
+    %% Fusion and Output
+    subgraph Fusion ["Late Fusion & Output"]
+        direction LR
+        Concat["Concatenate Layer<br/>(128 + 32 = 160 dimensi)"] ::: fusionNode
+        DenseF1["Dense Layer<br/>(128 neuron)"] ::: fusionNode
+        DenseF2["Dense Layer<br/>(64 neuron)"] ::: fusionNode
+        Softmax["Softmax Layer<br/>(3 Kelas Output)"] ::: outputNode
+        
+        Concat --> DenseF1 --> DenseF2 --> Softmax
+    end
+
+    %% Connections
+    ImgInput --> MobileNet
+    SympInput --> DenseM1
+    
+    DenseC2 -->|128 Dim| Concat
+    DenseM2 -->|32 Dim| Concat
+    
+    Softmax --> OutCampak("🔴 Campak") ::: outputNode
+    Softmax --> OutRubella("🟠 Rubella") ::: outputNode
+    Softmax --> OutCacar("🟡 Cacar Air") ::: outputNode

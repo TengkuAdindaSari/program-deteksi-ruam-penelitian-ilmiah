@@ -61,9 +61,7 @@ $model = $data['model_aktif'] ?? null;
                 <a href="/admin/models.php">
                     <i class="ti ti-cpu"></i> Kelola Model
                 </a>
-                <a href="/admin/stats.php">
-                    <i class="ti ti-chart-bar"></i> Statistik
-                </a>
+
             </div>
         </div>
 
@@ -72,12 +70,20 @@ $model = $data['model_aktif'] ?? null;
             <h2 class="page-title">Dashboard</h2>
 
             <!-- Metrik -->
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Total Diagnosis</div>
-                    <div class="metric-value"><?= number_format($data['total_diagnosis'] ?? 0) ?></div>
-                    <div class="metric-sub">+<?= $tren[count($tren)-1]['jumlah'] ?? 0 ?> hari ini</div>
+            <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 1.5rem;">
+                <div class="metric-card" style="border-top: 3px solid #2563EB;">
+                    <div class="metric-label" style="color:#2563EB;">Total Campak</div>
+                    <div class="metric-value" style="color:#2563EB;"><?= number_format($dist['campak'] ?? 0) ?></div>
                 </div>
+                <div class="metric-card" style="border-top: 3px solid #F59E0B;">
+                    <div class="metric-label" style="color:#B45309;">Total Rubella</div>
+                    <div class="metric-value" style="color:#F59E0B;"><?= number_format($dist['rubella'] ?? 0) ?></div>
+                </div>
+                <div class="metric-card" style="border-top: 3px solid #10B981;">
+                    <div class="metric-label" style="color:#059669;">Total Cacar Air</div>
+                    <div class="metric-value" style="color:#10B981;"><?= number_format($dist['cacar'] ?? 0) ?></div>
+                </div>
+                
                 <div class="metric-card">
                     <div class="metric-label">Total User</div>
                     <div class="metric-value"><?= number_format($data['total_user'] ?? 0) ?></div>

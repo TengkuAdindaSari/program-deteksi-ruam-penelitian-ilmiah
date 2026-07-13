@@ -48,11 +48,12 @@ SPLITS  = ['train', 'test']
 
 VALID_EXT = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
 
-# Kolom fitur gejala klinis (13 fitur, sesuai symptoms.csv)
+# Kolom fitur gejala klinis (10 fitur, setelah durasi_demam dan pilek dihapus)
 SYMPTOM_FEATURES = [
-    'durasi_demam', 'demam_tinggi', 'batuk', 'pilek', 'sakit_tenggorokan',
-    'konjungtivitis', 'koplik_spot', 'kelenjar_bengkak', 'ruam_wajah_ke_leher',
-    'nyeri_sendi', 'vesikel', 'hilang_nafsu_makan', 'lemas'
+    'demam_tinggi', 'demam_ringan',
+    'koplik_spot', 'kelenjar_bengkak', 'vesikel',
+    'konjungtivitis', 'nyeri_sendi', 'sakit_tenggorokan',
+    'lemas_malaise', 'pola_ruam'
 ]
 
 
@@ -120,17 +121,11 @@ def load_all_images() -> dict:
 
 def load_symptoms(csv_path: str = None) -> tuple:
     """
-    Membaca symptoms.csv, memisahkan fitur & label, normalisasi durasi_demam.
-
-    Kolom yang diharapkan di CSV (13 fitur):
-        label, durasi_demam, demam_tinggi, batuk, pilek, sakit_tenggorokan,
-        konjungtivitis, koplik_spot, kelenjar_bengkak, ruam_wajah_ke_leher,
-        nyeri_sendi, vesikel, hilang_nafsu_makan, lemas
+    Membaca symptoms.csv, memisahkan fitur & label.
 
     Return:
-        X_sym : np.ndarray shape (N, 13)
+        X_sym : np.ndarray shape (N, 10)
         y     : np.ndarray shape (N,) label integer
-        scaler: StandardScaler yang sudah di-fit (simpan untuk inferensi)
     """
     csv_path = csv_path or SYMPTOM_CSV
     print("\n=== Memuat data gejala klinis ===")
@@ -151,15 +146,11 @@ def load_symptoms(csv_path: str = None) -> tuple:
     X_sym = df[SYMPTOM_FEATURES].values.astype(np.float32)
     y_raw = df['label'].values
 
-    # Normalisasi hanya kolom durasi_demam (kolom indeks 0), sisanya sudah biner 0/1
-    scaler = StandardScaler()
-    X_sym[:, 0] = scaler.fit_transform(X_sym[:, 0].reshape(-1, 1)).ravel()
-
     class_to_idx = {cls: idx for idx, cls in enumerate(CLASSES)}
     y = np.array([class_to_idx[label] for label in y_raw], dtype=np.int64)
 
     print(f"  Distribusi kelas: {dict(zip(*np.unique(y_raw, return_counts=True)))}")
-    return X_sym, y, scaler
+    return X_sym, y
 
 
 def split_symptoms(X_sym: np.ndarray, y: np.ndarray,
@@ -182,20 +173,6 @@ def split_symptoms(X_sym: np.ndarray, y: np.ndarray,
 def load_data(data_path: str = None) -> dict:
     """
     Fungsi utama — load citra & gejala, kembalikan dict siap pakai.
-
-    PENTING: Karena jumlah gambar dan jumlah baris gejala TIDAK SAMA
-    (gambar bisa ratusan setelah augmentasi, gejala hanya puluhan baris),
-    kedua modalitas di-split SECARA TERPISAH dengan proporsi 80/20 yang
-    konsisten, lalu dipasangkan secara acak (sampling with replacement)
-    saat training agar ukuran batch citra & gejala selalu cocok.
-
-    Return:
-        {
-          'images'  : { X_train, y_train, X_test, y_test },
-          'symptoms': { X_train, y_train, X_test, y_test },
-          'scaler'  : StandardScaler (simpan untuk inferensi),
-          'classes' : ['campak', 'rubella', 'cacar']
-        }
     """
     global DATA_PATH, IMAGE_PATH, SYMPTOM_CSV
     if data_path:
@@ -204,14 +181,13 @@ def load_data(data_path: str = None) -> dict:
         SYMPTOM_CSV = os.path.join(data_path, 'symptoms.csv')
 
     img_data       = load_all_images()
-    X_sym, y, scaler = load_symptoms()
+    X_sym, y       = load_symptoms()
     sym_data       = split_symptoms(X_sym, y)
 
     print("\n[OK] Preprocessing selesai!")
     return {
         'images'  : img_data,
         'symptoms': sym_data,
-        'scaler'  : scaler,
         'classes' : CLASSES,
     }
 
@@ -246,14 +222,14 @@ def pair_images_with_symptoms(X_img, y_img, X_sym, y_sym, seed=42):
 if __name__ == '__main__':
     data = load_data()
 
-    print("\n--- Ringkasan Data Citra ---")
+    print("\n─── Ringkasan Data Citra ───")
     for cls in CLASSES:
         idx = CLASSES.index(cls)
         n_train = int(np.sum(data['images']['y_train'] == idx))
         n_test  = int(np.sum(data['images']['y_test']  == idx))
         print(f"  {cls:10s} | train: {n_train:4d} | test: {n_test:4d}")
 
-    print("\n--- Ringkasan Data Gejala ---")
+    print("\n─── Ringkasan Data Gejala ───")
     for cls in CLASSES:
         idx = CLASSES.index(cls)
         n_train = int(np.sum(data['symptoms']['y_train'] == idx))

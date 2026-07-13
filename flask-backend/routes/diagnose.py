@@ -9,34 +9,17 @@ Menghasilkan 3 hasil diagnosis sekaligus:
 
 import os
 import uuid
-import pickle
 import numpy as np
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from PIL import Image
 import tensorflow as tf
+import pickle
 
 from extensions import db
 from models import Diagnosis, ModelVersion
 
 diagnose_bp = Blueprint('diagnose', __name__)
-
-SCALER_PATH = os.path.normpath(os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    '..', 'model', 'scaler.pkl'
-))
-_scaler = None
-
-def get_scaler():
-    global _scaler
-    if _scaler is None:
-        if os.path.exists(SCALER_PATH):
-            try:
-                with open(SCALER_PATH, 'rb') as f:
-                    _scaler = pickle.load(f)
-            except Exception as e:
-                print(f"[SCALER] Gagal memuat scaler: {e}")
-    return _scaler
 
 # ─────────────────────────────────────────────
 # KONFIGURASI
@@ -54,23 +37,36 @@ def parse_identity(raw):
         return {'id': raw, 'role': 'user'}
     import json
     try:
-        val = json.loads(raw)
-        if isinstance(val, dict):
-            return val
-        if isinstance(val, int):
-            return {'id': val, 'role': 'user'}
-        return {'id': int(val), 'role': 'user'}
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return parsed
+        else:
+            return {'id': int(parsed), 'role': 'user'}
     except Exception:
-        try:
-            return {'id': int(raw), 'role': 'user'}
-        except Exception:
-            return {'id': raw, 'role': 'user'}
-
+        return {'id': int(raw) if str(raw).isdigit() else raw, 'role': 'user'}
 
 CLASSES      = ['campak', 'rubella', 'cacar']
 CLASSES_DISP = ['Campak', 'Rubella', 'Cacar Air']
 
 _model_cache = {}
+# Cache dictionary untuk Random Forest model agar tidak dimuat berulang kali
+_rf_cache   = {}
+
+
+def get_rf_model():
+    """Load Random Forest model dari file pkl."""
+    import os
+    rf_path = os.path.normpath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        '..', 'model', 'rf_model.pkl'
+    ))
+    if 'rf' not in _rf_cache:
+        if not os.path.exists(rf_path):
+            return None
+        with open(rf_path, 'rb') as f:
+            _rf_cache['rf'] = pickle.load(f)
+        print('[MODEL] RF loaded')
+    return _rf_cache.get('rf')
 
 
 # ─────────────────────────────────────────────
@@ -78,7 +74,6 @@ _model_cache = {}
 # ─────────────────────────────────────────────
 
 def get_active_model():
-    """Load model aktif dari database. Cache di memory."""
     active = ModelVersion.query.filter_by(is_active=True).first()
     if not active:
         return None, None
@@ -113,31 +108,23 @@ def preprocess_image(filepath: str) -> np.ndarray:
 
 
 def preprocess_symptoms(data) -> np.ndarray:
-    """Susun vektor gejala klinis (1, 13)."""
-    durasi_demam = float(data.get('durasi_demam', 4))
-    scaler = get_scaler()
-    if scaler is not None:
-        try:
-            durasi_norm = float(scaler.transform([[durasi_demam]])[0][0])
-        except Exception:
-            durasi_norm = (durasi_demam - 4.0) / 1.2
-    else:
-        durasi_norm = (durasi_demam - 4.0) / 1.2
-
+    """
+    Susun vektor gejala klinis (1, 10) sesuai dataset terbaru.
+    Kolom: demam_tinggi, demam_ringan, koplik_spot,
+           kelenjar_bengkak, vesikel, konjungtivitis, nyeri_sendi,
+           sakit_tenggorokan, lemas_malaise, pola_ruam
+    """
     return np.array([[
-        durasi_norm,
-        int(data.get('demam_tinggi',       0)),
-        int(data.get('batuk',              0)),
-        int(data.get('pilek',              0)),
-        int(data.get('sakit_tenggorokan',  0)),
-        int(data.get('mata_merah',         0)), # Maps to konjungtivitis
-        int(data.get('koplik_spot',        0)),
-        int(data.get('kelenjar_bengkak',   0)),
-        int(data.get('pola_ruam',          0)), # Maps to ruam_wajah_ke_leher
-        int(data.get('nyeri_sendi',        0)),
-        int(data.get('vesikel',            0)),
-        int(data.get('hilang_nafsu_makan', 0)),
-        int(data.get('lemas',              0))
+        int(data.get('demam_tinggi',      0)),
+        int(data.get('demam_ringan',      0)),
+        int(data.get('koplik_spot',       0)),
+        int(data.get('kelenjar_bengkak',  0)),
+        int(data.get('vesikel',           0)),
+        int(data.get('konjungtivitis',    data.get('mata_merah', 0))),
+        int(data.get('nyeri_sendi',       0)),
+        int(data.get('sakit_tenggorokan', 0)),
+        int(data.get('lemas_malaise',     data.get('lemas', 0))),
+        1, # pola_ruam di-hardcode ke 1 (karena selalu 100% pada semua kasus)
     ]], dtype=np.float32)
 
 
@@ -145,14 +132,12 @@ def preprocess_symptoms(data) -> np.ndarray:
 # TRIPLE PREDICTION
 # ─────────────────────────────────────────────
 
-def predict_triple(model, img_array: np.ndarray, sym_array: np.ndarray) -> dict:
+def predict_triple(model, img_array: np.ndarray, sym_array: np.ndarray, rf_model=None) -> dict:
     """
     Jalankan 3 prediksi sekaligus:
       1. CNN Only  — foto asli + gejala netral (semua nol)
-      2. MLP Only  — foto hitam (nol) + gejala asli
-      3. Fusion    — foto asli + gejala asli (hasil utama)
-
-    Return dict berisi probabilitas dan prediksi ketiga metode.
+      2. RF Only   — menggunakan model Random Forest khusus gejala
+      3. Fusion    — Average probabilitas CNN + RF
     """
 
     # ── 1. CNN Only ──
@@ -163,26 +148,31 @@ def predict_triple(model, img_array: np.ndarray, sym_array: np.ndarray) -> dict:
         verbose=0
     )[0]
 
-    # ── 2. MLP Only ──
-    # Matikan pengaruh foto dengan gambar hitam
-    img_hitam  = np.zeros_like(img_array)
-    probs_mlp  = model.predict(
-        {'input_citra': img_hitam, 'input_gejala': sym_array},
-        verbose=0
-    )[0]
+    # ── 2. RF Only ──
+    if rf_model is not None:
+        rf_probs_raw = rf_model.predict_proba(sym_array)[0]
+        rf_classes = list(rf_model.classes_)
+        probs_rf = np.zeros(3)
+        for i, c in enumerate(CLASSES):
+            if c in rf_classes:
+                probs_rf[i] = rf_probs_raw[rf_classes.index(c)]
+    else:
+        # Fallback jika RF tidak ada, pakai MLP
+        img_hitam  = np.zeros_like(img_array)
+        probs_rf  = model.predict(
+            {'input_citra': img_hitam, 'input_gejala': sym_array},
+            verbose=0
+        )[0]
 
-    # ── 3. Fusion (Normal) ──
-    probs_fusion = model.predict(
-        {'input_citra': img_array, 'input_gejala': sym_array},
-        verbose=0
-    )[0]
+    # ── 3. Fusion ──
+    probs_fusion = (probs_cnn + probs_rf) / 2.0
 
     def parse_result(probs):
-        idx = int(np.argmax(probs))
+        idx   = int(np.argmax(probs))
         return {
-            'prediksi'    : CLASSES[idx],
-            'label'       : CLASSES_DISP[idx],
-            'confidence'  : round(float(probs[idx]) * 100, 2),
+            'prediksi'  : CLASSES[idx],
+            'label'     : CLASSES_DISP[idx],
+            'confidence': round(float(probs[idx]) * 100, 2),
             'probabilitas': {
                 'campak' : round(float(probs[0]) * 100, 2),
                 'rubella': round(float(probs[1]) * 100, 2),
@@ -191,7 +181,7 @@ def predict_triple(model, img_array: np.ndarray, sym_array: np.ndarray) -> dict:
         }
 
     cnn    = parse_result(probs_cnn)
-    mlp    = parse_result(probs_mlp)
+    mlp    = parse_result(probs_rf)
     fusion = parse_result(probs_fusion)
 
     # ── Konsistensi ──
@@ -199,15 +189,15 @@ def predict_triple(model, img_array: np.ndarray, sym_array: np.ndarray) -> dict:
     unik          = len(set(prediksi_list))
 
     if unik == 1:
-        konsistensi       = 'konsisten'
+        konsistensi = 'konsisten'
         konsistensi_label = 'Konsisten — Kepercayaan Tinggi'
         konsistensi_icon  = 'success'
     elif unik == 2:
-        konsistensi       = 'mayoritas'
+        konsistensi = 'mayoritas'
         konsistensi_label = 'Mayoritas — Disarankan Konsultasi Dokter'
         konsistensi_icon  = 'warning'
     else:
-        konsistensi       = 'tidak_konsisten'
+        konsistensi = 'tidak_konsisten'
         konsistensi_label = 'Tidak Konsisten — Wajib Konsultasi Dokter'
         konsistensi_icon  = 'danger'
 
@@ -232,15 +222,6 @@ def predict_triple(model, img_array: np.ndarray, sym_array: np.ndarray) -> dict:
 def predict():
     """
     Endpoint prediksi triple — menghasilkan 3 hasil sekaligus.
-
-    Form-data:
-        foto            : file gambar
-        durasi_demam    : int
-        batuk           : 0/1
-        mata_merah      : 0/1
-        kelenjar_bengkak: 0/1
-        pola_ruam       : 0/1
-        vesikel         : 0/1
     """
     identity = parse_identity(get_jwt_identity())
 
@@ -260,6 +241,7 @@ def predict():
 
     # Load model
     model, model_version = get_active_model()
+    rf_model = get_rf_model()
     if model is None:
         os.remove(save_path)
         return jsonify({'success': False, 'message': 'Model belum tersedia'}), 503
@@ -268,7 +250,7 @@ def predict():
     try:
         img_array = preprocess_image(save_path)
         sym_array = preprocess_symptoms(request.form)
-        triple    = predict_triple(model, img_array, sym_array)
+        triple    = predict_triple(model, img_array, sym_array, rf_model=rf_model)
 
     except Exception as e:
         os.remove(save_path)
@@ -280,31 +262,25 @@ def predict():
     confidence = fusion['confidence'] / 100
 
     # Simpan ke database (simpan hasil fusion sebagai hasil utama)
-    import json
     diagnosis = Diagnosis(
         user_id          = identity['id'],
         model_id         = model_version.id if model_version else None,
         foto_path        = filename,
-        durasi_demam     = int(request.form.get('durasi_demam', 4)),
         demam_tinggi     = bool(int(request.form.get('demam_tinggi',     0))),
-        batuk            = bool(int(request.form.get('batuk',            0))),
-        pilek            = bool(int(request.form.get('pilek',            0))),
-        sakit_tenggorokan= bool(int(request.form.get('sakit_tenggorokan', 0))),
-        mata_merah       = bool(int(request.form.get('mata_merah',       0))),
+        demam_ringan     = bool(int(request.form.get('demam_ringan',     0))),
+        sakit_tenggorokan= bool(int(request.form.get('sakit_tenggorokan',0))),
+        konjungtivitis   = bool(int(request.form.get('konjungtivitis',   data.get('mata_merah', 0) if 'data' in locals() else request.form.get('mata_merah', 0)))),
         koplik_spot      = bool(int(request.form.get('koplik_spot',      0))),
         kelenjar_bengkak = bool(int(request.form.get('kelenjar_bengkak', 0))),
-        pola_ruam        = bool(int(request.form.get('pola_ruam',        0))),
         nyeri_sendi      = bool(int(request.form.get('nyeri_sendi',      0))),
         vesikel          = bool(int(request.form.get('vesikel',          0))),
-        hilang_nafsu_makan=bool(int(request.form.get('hilang_nafsu_makan',0))),
-        lemas            = bool(int(request.form.get('lemas',            0))),
+        lemas_malaise    = bool(int(request.form.get('lemas_malaise',     request.form.get('lemas', 0)))),
         hasil            = hasil,
         confidence       = confidence,
         prob_campak      = fusion['probabilitas']['campak']  / 100,
         prob_rubella     = fusion['probabilitas']['rubella'] / 100,
         prob_cacar       = fusion['probabilitas']['cacar']   / 100,
         status           = 'selesai',
-        triple_data      = json.dumps(triple),
     )
     db.session.add(diagnosis)
     db.session.commit()
@@ -327,7 +303,6 @@ def predict():
 @diagnose_bp.route('/history', methods=['GET'])
 @jwt_required()
 def history_user():
-    """Riwayat diagnosis milik user yang login."""
     identity = parse_identity(get_jwt_identity())
     page     = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
@@ -353,7 +328,6 @@ def history_user():
 @diagnose_bp.route('/history/<int:diagnosis_id>', methods=['GET'])
 @jwt_required()
 def detail_diagnosis(diagnosis_id):
-    """Detail satu hasil diagnosis milik user."""
     identity  = parse_identity(get_jwt_identity())
     diagnosis = Diagnosis.query.filter_by(
         id=diagnosis_id, user_id=identity['id']
@@ -366,7 +340,6 @@ def detail_diagnosis(diagnosis_id):
 @diagnose_bp.route('/history/<int:diagnosis_id>', methods=['DELETE'])
 @jwt_required()
 def delete_diagnosis(diagnosis_id):
-    """Hapus (soft delete) satu hasil diagnosis milik user."""
     identity  = parse_identity(get_jwt_identity())
     diagnosis = Diagnosis.query.filter_by(
         id=diagnosis_id, user_id=identity['id']

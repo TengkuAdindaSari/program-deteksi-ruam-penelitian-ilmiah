@@ -1,12 +1,3 @@
-Mermaid Class Diagram Code — DermDetect
-Sistem Klasifikasi Penyakit Ruam Kulit (Campak | Rubella | Cacar Air)
-
-Salin blok kode di bawah ini mulai dari tulisan "classDiagram" ke: https://mermaid.live
-
-================================================================================
-Class Diagram — Entity Relationship (Models)
-================================================================================
-
 classDiagram
     direction TB
 

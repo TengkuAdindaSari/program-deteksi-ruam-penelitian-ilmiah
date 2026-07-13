@@ -37,7 +37,7 @@ print(f"Image folder: {IMAGE_BASE}")
 # ─────────────────────────────────────────────
 CLASSES        = ['campak', 'rubella', 'cacar']
 TARGET_SPLIT   = 'train'        # augmentasi hanya pada folder train
-AUG_PER_IMAGE  = 15
+AUG_PER_IMAGE  = 30
 VALID_EXT      = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
 
 
@@ -102,6 +102,22 @@ RECIPES = [
     [lambda img: contrast(img, 1.4)],
     [lambda img: saturation(img, 1.5)],
     [lambda img: blur_img(img, 1.0)],
+    # --- 15 Resep Ekstrem Baru ---
+    [lambda img: rotate(img, -45)],
+    [lambda img: rotate(img, 45)],
+    [lambda img: noise(img, 30)],
+    [lambda img: noise(img, 50)],
+    [lambda img: blur_img(img, 2.5)],
+    [lambda img: translate(img, 20, 20)],
+    [lambda img: translate(img, -20, -20)],
+    [lambda img: translate(img, -20, 20)],
+    [lambda img: translate(img, 20, -20)],
+    [lambda img: contrast(img, 0.6)],
+    [lambda img: contrast(img, 1.8)],
+    [lambda img: brightness(img, 1.6)],
+    [lambda img: brightness(img, 0.5)],
+    [lambda img: saturation(img, 0.5)],
+    [lambda img: saturation(img, 2.0)],
 ]
 
 assert len(RECIPES) == AUG_PER_IMAGE, \
